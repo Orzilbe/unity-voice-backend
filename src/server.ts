@@ -20,7 +20,7 @@ import { connectToDatabase } from './lib/db';
 // Load environment variables
 dotenv.config();
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8080;
 
 // Middleware
 app.use(helmet()); // Adds security headers
