@@ -1,0 +1,55 @@
+{
+  "name": "unity-voice-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unity Voice Learning Platform - Backend API",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit",
+    "migrate": "npx sequelize-cli db:migrate",
+    "diagnose": "ts-node src/scripts/diagnoseDb.ts",
+    "db:test": "ts-node src/scripts/connectionTest.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^4.21.2",
+    "express-validator": "^7.2.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.1",
+    "openai": "^4.103.0",
+    "sequelize": "^6.37.7"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^20.10.5",
+    "eslint": "^8.56.0",
+    "nodemon": "^3.0.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.3"
+  },
+  "keywords": [
+    "express",
+    "nodejs",
+    "typescript",
+    "api",
+    "learning-platform",
+    "mysql",
+    "sequelize"
+  ],
+  "author": "Unity Voice Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
