@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "test": "echo \"No tests specified\" && exit 0",
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "migrate": "npx sequelize-cli db:migrate",
