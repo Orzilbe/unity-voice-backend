@@ -15,6 +15,11 @@ import userWordsRoutes from './routes/userWordsRoutes';
 import interactiveSessionRoutes from './routes/interactiveSessionRoutes';
 import flashcardRoutes from './routes/flashcardRoutes';
 import questionRoutes from './routes/questionRoutes';
+import wordsRoutes from './routes/wordsRoutes';
+import userProfileRoutes from './routes/userProfileRoutes';
+import postRoutes from './routes/postRoutes';
+import commentRoutes from './routes/commentRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -25,7 +30,7 @@ dotenv.config();
 
 // Create Express app
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 // Middleware
 app.use(helmet()); // Adds security headers
@@ -91,6 +96,11 @@ app.use('/api/user-words', userWordsRoutes);
 app.use('/api/interactive-sessions', interactiveSessionRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/questions', questionRoutes);
+app.use('/api/words', wordsRoutes);
+app.use('/api/user-profile', userProfileRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // 404 handler for unmatched routes
 app.use('*', (req: Request, res: Response) => {

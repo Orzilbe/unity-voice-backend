@@ -404,4 +404,49 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * קבלת משימות של המשתמש הנוכחי
+ * GET /api/tasks
+ */
+router.get('/', authMiddleware, async (req: IUserRequest, res) => {
+  try {
+    console.log('GET /api/tasks - Fetching current user tasks');
+    
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' });
+    }
+    
+    // קבלת פרמטרים מה-URL
+    const { topicName } = req.query;
+    
+    const connection = await pool.getConnection();
+    try {
+      let query = `SELECT * FROM Tasks WHERE UserId = ?`;
+      const params: any[] = [userId];
+      
+      // סינון לפי נושא אם נדרש
+      if (topicName) {
+        query += ` AND (TopicName = ? OR LOWER(TopicName) = LOWER(?))`;
+        params.push(topicName, topicName);
+      }
+      
+      query += ` ORDER BY 
+        CASE WHEN CompletionDate IS NULL THEN 0 ELSE 1 END, 
+        StartDate DESC`;
+      
+      const [tasks] = await connection.query(query, params);
+      
+      console.log(`Retrieved ${(tasks as any[]).length} tasks for user ${userId}`);
+      res.json(tasks);
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error fetching user tasks:', error);
+    res.status(500).json({ error: 'Failed to fetch user tasks' });
+  }
+});
+
 export default router;

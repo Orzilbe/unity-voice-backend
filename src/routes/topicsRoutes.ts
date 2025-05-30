@@ -1,20 +1,42 @@
 // apps/api/src/routes/topicsRoutes.ts
 import express from 'express';
-import DatabaseConnection from '../config/database';
+import pool from '../models/db';
 import { authMiddleware } from '../middleware/authMiddleware';
-import { AppError } from '../middleware/errorHandler';
+import { TokenPayload } from '../types/auth';
+
+// Define the user request interface
+interface IUserRequest extends express.Request {
+  user?: TokenPayload;
+}
 
 const router = express.Router();
 
-// Get all topics
-router.get('/', authMiddleware, async (req, res, next) => {
+/**
+ * קבלת כל הנושאים
+ * GET /api/topics
+ */
+router.get('/', authMiddleware, async (req: IUserRequest, res) => {
   try {
-    const pool = DatabaseConnection.getPool();
-    const [topics] = await pool.query('SELECT TopicName, TopicHe, Icon FROM Topics');
+    console.log('Getting all topics');
     
-    res.json(topics);
+    const connection = await pool.getConnection();
+    
+    try {
+      const [topics] = await connection.execute(
+        'SELECT TopicName, TopicHe, Icon FROM Topics ORDER BY TopicName'
+      );
+      
+      console.log(`Retrieved ${(topics as any[]).length} topics`);
+      return res.json(topics);
+    } finally {
+      connection.release();
+    }
   } catch (error) {
-    next(error);
+    console.error('Error fetching topics:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    });
   }
 });
 

@@ -29,7 +29,7 @@ async function testEndpoint(endpoint) {
     const config = {
       method: endpoint.method,
       url: `${BASE_URL}${endpoint.path}`,
-      timeout: 10000,
+      timeout: 30000, // Increased timeout to 30 seconds
       headers: {
         'Content-Type': 'application/json'
       }
@@ -39,6 +39,7 @@ async function testEndpoint(endpoint) {
       config.data = endpoint.data;
     }
 
+    console.log(`🔄 Testing ${endpoint.name}...`);
     const response = await axios(config);
     
     console.log(`✅ ${endpoint.name}: ${response.status} ${response.statusText}`);
@@ -66,6 +67,9 @@ async function runTests() {
     const result = await testEndpoint(endpoint);
     results.push({ ...endpoint, result });
     console.log(''); // Add spacing between tests
+    
+    // Add a small delay between requests
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
   
   // Summary

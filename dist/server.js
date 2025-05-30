@@ -19,6 +19,11 @@ const userWordsRoutes_1 = __importDefault(require("./routes/userWordsRoutes"));
 const interactiveSessionRoutes_1 = __importDefault(require("./routes/interactiveSessionRoutes"));
 const flashcardRoutes_1 = __importDefault(require("./routes/flashcardRoutes"));
 const questionRoutes_1 = __importDefault(require("./routes/questionRoutes"));
+const wordsRoutes_1 = __importDefault(require("./routes/wordsRoutes"));
+const userProfileRoutes_1 = __importDefault(require("./routes/userProfileRoutes"));
+const postRoutes_1 = __importDefault(require("./routes/postRoutes"));
+const commentRoutes_1 = __importDefault(require("./routes/commentRoutes"));
+const dashboardRoutes_1 = __importDefault(require("./routes/dashboardRoutes"));
 // Import middleware
 const errorHandler_1 = require("./middleware/errorHandler");
 const db_1 = require("./lib/db");
@@ -26,7 +31,7 @@ const db_1 = require("./lib/db");
 dotenv_1.default.config();
 // Create Express app
 const app = (0, express_1.default)();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 // Middleware
 app.use((0, helmet_1.default)()); // Adds security headers
 app.use((0, cors_1.default)({
@@ -87,6 +92,11 @@ app.use('/api/user-words', userWordsRoutes_1.default);
 app.use('/api/interactive-sessions', interactiveSessionRoutes_1.default);
 app.use('/api/flashcards', flashcardRoutes_1.default);
 app.use('/api/questions', questionRoutes_1.default);
+app.use('/api/words', wordsRoutes_1.default);
+app.use('/api/user-profile', userProfileRoutes_1.default);
+app.use('/api/posts', postRoutes_1.default);
+app.use('/api/comments', commentRoutes_1.default);
+app.use('/api/dashboard', dashboardRoutes_1.default);
 // 404 handler for unmatched routes
 app.use('*', (req, res) => {
     res.status(404).json({
