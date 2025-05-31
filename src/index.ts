@@ -1,4 +1,4 @@
-// apps/api/src/index.ts
+// unity-voice-backend/src/index.ts
 import express from 'express';
 import cors from 'cors';
 import { connectToDatabase } from './lib/db';
@@ -41,7 +41,7 @@ async function startServer() {
       res.send('English Speaking Practice API is running');
     });
     
-    const PORT = process.env.PORT || 3001;
+    const PORT = process.env.PORT;
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
