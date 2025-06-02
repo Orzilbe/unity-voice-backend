@@ -17,7 +17,7 @@ class WordInTask {
   static async findByTaskAndWord(taskId: string, wordId: string): Promise<IWordInTask | null> {
     try {
       const [rows] = await pool.execute<IWordInTask[]>(
-        'SELECT * FROM WordsInTask WHERE TaskId = ? AND WordId = ?',
+        'SELECT * FROM wordintask WHERE TaskId = ? AND WordId = ?',
         [taskId, wordId]
       );
       
@@ -32,7 +32,7 @@ class WordInTask {
   static async findByTaskId(taskId: string): Promise<IWordInTask[]> {
     try {
       const [rows] = await pool.execute<IWordInTask[]>(
-        'SELECT * FROM WordsInTask WHERE TaskId = ? ORDER BY CreatedAt',
+        'SELECT * FROM wordintask WHERE TaskId = ? ORDER BY CreatedAt',
         [taskId]
       );
       
@@ -47,7 +47,7 @@ class WordInTask {
   static async findTasksByUserAndWord(userId: string, wordId: string): Promise<IWordInTask[]> {
     try {
       const [rows] = await pool.execute<IWordInTask[]>(
-        `SELECT wit.* FROM WordsInTask wit
+        `SELECT wit.* FROM wordintask wit
          JOIN Tasks t ON wit.TaskId = t.TaskId
          WHERE t.UserId = ? AND wit.WordId = ?
          ORDER BY wit.CreatedAt DESC`,
@@ -65,7 +65,7 @@ class WordInTask {
   static async hasUserLearnedWord(userId: string, wordId: string): Promise<boolean> {
     try {
       const [rows] = await pool.execute<RowDataPacket[]>(
-        `SELECT 1 FROM WordsInTask wit
+        `SELECT 1 FROM wordintask wit
          JOIN Tasks t ON wit.TaskId = t.TaskId
          WHERE t.UserId = ? AND wit.WordId = ? AND wit.IsCompleted = TRUE
          LIMIT 1`,
@@ -83,7 +83,7 @@ class WordInTask {
   static async getWordsLearnedByUser(userId: string): Promise<IWordInTask[]> {
     try {
       const [rows] = await pool.execute<IWordInTask[]>(
-        `SELECT wit.* FROM WordsInTask wit
+        `SELECT wit.* FROM wordintask wit
          JOIN Tasks t ON wit.TaskId = t.TaskId
          WHERE t.UserId = ? AND wit.IsCompleted = TRUE
          ORDER BY wit.CreatedAt DESC`,
@@ -107,7 +107,7 @@ class WordInTask {
   }): Promise<boolean> {
     try {
       const [result] = await pool.execute<ResultSetHeader>(
-        `INSERT INTO WordsInTask 
+        `INSERT INTO wordintask 
          (TaskId, WordId, IsCompleted, Score, Attempts, CreatedAt, UpdatedAt)
          VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
         [
@@ -140,7 +140,7 @@ class WordInTask {
       }
       
       const [result] = await pool.execute<ResultSetHeader>(
-        `UPDATE WordsInTask 
+        `UPDATE wordintask 
          SET IsCompleted = TRUE, Score = ?, Attempts = Attempts + 1, UpdatedAt = NOW() 
          WHERE TaskId = ? AND WordId = ?`,
         [score || 100, taskId, wordId]
@@ -158,7 +158,7 @@ class WordInTask {
     try {
       const [rows] = await pool.execute<RowDataPacket[]>(
         `SELECT COUNT(*) AS total, SUM(CASE WHEN IsCompleted = 1 THEN 1 ELSE 0 END) AS completed
-         FROM WordsInTask WHERE TaskId = ?`,
+         FROM wordintask WHERE TaskId = ?`,
         [taskId]
       );
       

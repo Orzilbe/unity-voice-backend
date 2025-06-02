@@ -286,11 +286,11 @@ export async function addWordsToTask(
     }
     
     // בדיקה אם הטבלה קיימת ויצירה אם צריך
-    const [tables] = await pool.query('SHOW TABLES LIKE ?', ['WordsInTask']);
+    const [tables] = await pool.query('SHOW TABLES LIKE ?', ['wordintask']);
     if (!Array.isArray(tables) || tables.length === 0) {
-      console.log('Creating WordsInTask table');
+      console.log('Creating wordintask table');
       await pool.query(`
-        CREATE TABLE WordsInTask (
+        CREATE TABLE wordintask (
           TaskId CHAR(36) NOT NULL,
           WordId CHAR(36) NOT NULL,
           PRIMARY KEY (TaskId, WordId)
@@ -302,7 +302,7 @@ export async function addWordsToTask(
     for (const wordId of wordIds) {
       try {
         await pool.query(
-          'INSERT IGNORE INTO WordsInTask (TaskId, WordId) VALUES (?, ?)',
+          'INSERT IGNORE INTO wordintask (TaskId, WordId) VALUES (?, ?)',
           [taskId, wordId]
         );
       } catch (error) {

@@ -23,7 +23,7 @@ router.get('/known', authMiddleware, async (req: IUserRequest, res: express.Resp
     const [words] = await dbConnection.execute(
       `SELECT DISTINCT w.* 
        FROM Words w
-       INNER JOIN WordsInTask wit ON w.WordId = wit.WordId
+       INNER JOIN wordintask wit ON w.WordId = wit.WordId
        INNER JOIN Tasks t ON wit.TaskId = t.TaskId
        WHERE t.UserId = ?
        ORDER BY wit.AddedAt DESC`,
@@ -101,7 +101,7 @@ router.post('/known', authMiddleware, async (req: IUserRequest, res: express.Res
     
     // Add word to task
     await dbConnection.execute(
-      'INSERT INTO WordsInTask (TaskId, WordId, AddedAt) VALUES (?, ?, NOW())',
+      'INSERT INTO wordintask (TaskId, WordId, AddedAt) VALUES (?, ?, NOW())',
       [taskId, wordId]
     );
     
@@ -135,7 +135,7 @@ router.delete('/known/:wordId', authMiddleware, async (req: IUserRequest, res: e
     await dbConnection.execute(
       `DELETE t, wit 
        FROM Tasks t
-       INNER JOIN WordsInTask wit ON t.TaskId = wit.TaskId
+       INNER JOIN wordintask wit ON t.TaskId = wit.TaskId
        WHERE t.UserId = ? 
        AND t.TaskType = 'word_known'
        AND wit.WordId = ?`,

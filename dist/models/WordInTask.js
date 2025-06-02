@@ -8,7 +8,7 @@ class WordInTask {
     // Find word in task
     static async findByTaskAndWord(taskId, wordId) {
         try {
-            const [rows] = await db_1.default.execute('SELECT * FROM WordsInTask WHERE TaskId = ? AND WordId = ?', [taskId, wordId]);
+            const [rows] = await db_1.default.execute('SELECT * FROM wordintask WHERE TaskId = ? AND WordId = ?', [taskId, wordId]);
             return rows.length ? rows[0] : null;
         }
         catch (error) {
@@ -19,7 +19,7 @@ class WordInTask {
     // Find words by task ID
     static async findByTaskId(taskId) {
         try {
-            const [rows] = await db_1.default.execute('SELECT * FROM WordsInTask WHERE TaskId = ? ORDER BY CreatedAt', [taskId]);
+            const [rows] = await db_1.default.execute('SELECT * FROM wordintask WHERE TaskId = ? ORDER BY CreatedAt', [taskId]);
             return rows;
         }
         catch (error) {
@@ -30,7 +30,7 @@ class WordInTask {
     // Find tasks by user and word ID
     static async findTasksByUserAndWord(userId, wordId) {
         try {
-            const [rows] = await db_1.default.execute(`SELECT wit.* FROM WordsInTask wit
+            const [rows] = await db_1.default.execute(`SELECT wit.* FROM wordintask wit
          JOIN Tasks t ON wit.TaskId = t.TaskId
          WHERE t.UserId = ? AND wit.WordId = ?
          ORDER BY wit.CreatedAt DESC`, [userId, wordId]);
@@ -44,7 +44,7 @@ class WordInTask {
     // Check if user has learned a specific word
     static async hasUserLearnedWord(userId, wordId) {
         try {
-            const [rows] = await db_1.default.execute(`SELECT 1 FROM WordsInTask wit
+            const [rows] = await db_1.default.execute(`SELECT 1 FROM wordintask wit
          JOIN Tasks t ON wit.TaskId = t.TaskId
          WHERE t.UserId = ? AND wit.WordId = ? AND wit.IsCompleted = TRUE
          LIMIT 1`, [userId, wordId]);
@@ -58,7 +58,7 @@ class WordInTask {
     // Get all words learned by a user
     static async getWordsLearnedByUser(userId) {
         try {
-            const [rows] = await db_1.default.execute(`SELECT wit.* FROM WordsInTask wit
+            const [rows] = await db_1.default.execute(`SELECT wit.* FROM wordintask wit
          JOIN Tasks t ON wit.TaskId = t.TaskId
          WHERE t.UserId = ? AND wit.IsCompleted = TRUE
          ORDER BY wit.CreatedAt DESC`, [userId]);
@@ -72,7 +72,7 @@ class WordInTask {
     // Add word to task
     static async addWordToTask(wordInTaskData) {
         try {
-            const [result] = await db_1.default.execute(`INSERT INTO WordsInTask 
+            const [result] = await db_1.default.execute(`INSERT INTO wordintask 
          (TaskId, WordId, IsCompleted, Score, Attempts, CreatedAt, UpdatedAt)
          VALUES (?, ?, ?, ?, ?, NOW(), NOW())`, [
                 wordInTaskData.TaskId,
@@ -95,7 +95,7 @@ class WordInTask {
             if (!wordInTask) {
                 return false;
             }
-            const [result] = await db_1.default.execute(`UPDATE WordsInTask 
+            const [result] = await db_1.default.execute(`UPDATE wordintask 
          SET IsCompleted = TRUE, Score = ?, Attempts = Attempts + 1, UpdatedAt = NOW() 
          WHERE TaskId = ? AND WordId = ?`, [score || 100, taskId, wordId]);
             return result.affectedRows > 0;
@@ -109,7 +109,7 @@ class WordInTask {
     static async areAllWordsCompleted(taskId) {
         try {
             const [rows] = await db_1.default.execute(`SELECT COUNT(*) AS total, SUM(CASE WHEN IsCompleted = 1 THEN 1 ELSE 0 END) AS completed
-         FROM WordsInTask WHERE TaskId = ?`, [taskId]);
+         FROM wordintask WHERE TaskId = ?`, [taskId]);
             if (rows.length === 0 || rows[0].total === 0) {
                 return false;
             }

@@ -281,7 +281,7 @@ router.put('/:taskId/complete', authMiddleware, async (req: IUserRequest, res: e
       
       // Insert word usage records
       await dbConnection.query(
-        'INSERT INTO WordsInTask (TaskId, WordId, AddedAt) VALUES ?',
+        'INSERT INTO wordintask (TaskId, WordId, AddedAt) VALUES ?',
         [values]
       );
     }
@@ -343,7 +343,7 @@ router.post('/:taskId/words', authMiddleware, async (req: IUserRequest, res: exp
     
     // Insert word usage records
     await dbConnection.query(
-      'INSERT INTO WordsInTask (TaskId, WordId, AddedAt) VALUES ?',
+      'INSERT INTO wordintask (TaskId, WordId, AddedAt) VALUES ?',
       [values]
     );
     

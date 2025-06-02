@@ -18,7 +18,7 @@ router.get('/known', authMiddleware_1.authMiddleware, async (req, res) => {
         // Get words that the user has marked as known through tasks
         const [words] = await dbConnection.execute(`SELECT DISTINCT w.* 
        FROM Words w
-       INNER JOIN WordsInTask wit ON w.WordId = wit.WordId
+       INNER JOIN wordintask wit ON w.WordId = wit.WordId
        INNER JOIN Tasks t ON wit.TaskId = t.TaskId
        WHERE t.UserId = ?
        ORDER BY wit.AddedAt DESC`, [req.user?.id]);
@@ -80,7 +80,7 @@ router.post('/known', authMiddleware_1.authMiddleware, async (req, res) => {
             100 // Default score for known words
         ]);
         // Add word to task
-        await dbConnection.execute('INSERT INTO WordsInTask (TaskId, WordId, AddedAt) VALUES (?, ?, NOW())', [taskId, wordId]);
+        await dbConnection.execute('INSERT INTO wordintask (TaskId, WordId, AddedAt) VALUES (?, ?, NOW())', [taskId, wordId]);
         await dbConnection.commit();
         res.json({ success: true });
     }
@@ -110,7 +110,7 @@ router.delete('/known/:wordId', authMiddleware_1.authMiddleware, async (req, res
         // Delete the task and its word associations
         await dbConnection.execute(`DELETE t, wit 
        FROM Tasks t
-       INNER JOIN WordsInTask wit ON t.TaskId = wit.TaskId
+       INNER JOIN wordintask wit ON t.TaskId = wit.TaskId
        WHERE t.UserId = ? 
        AND t.TaskType = 'word_known'
        AND wit.WordId = ?`, [req.user?.id, wordId]);

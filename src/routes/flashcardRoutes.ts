@@ -510,7 +510,7 @@ router.get('/:topic/:level', authMiddleware, async (req: IUserRequest, res) => {
       query += `
         AND w.WordId NOT IN (
           SELECT wi.WordId
-          FROM WordsInTask wi
+          FROM wordintask wi
           JOIN Tasks ta ON wi.TaskId = ta.TaskId
           WHERE ta.UserId = ?
         )
@@ -593,13 +593,13 @@ router.post('/mark-learned', authMiddleware, async (req: IUserRequest, res) => {
     }
     
     // בדיקה אם המילה כבר נמצאת במשימה
-    const [wordsInTask] = await pool.execute(
-      'SELECT * FROM WordsInTask WHERE TaskId = ? AND WordId = ?',
+    const [wordintask] = await pool.execute(
+      'SELECT * FROM wordintask WHERE TaskId = ? AND WordId = ?',
       [TaskId, WordId]
     );
     
     // אם המילה כבר במשימה, החזר הצלחה
-    if (Array.isArray(wordsInTask) && wordsInTask.length > 0) {
+    if (Array.isArray(wordintask) && wordintask.length > 0) {
       return res.json({ 
         success: true, 
         message: 'Word already marked as learned' 
@@ -608,7 +608,7 @@ router.post('/mark-learned', authMiddleware, async (req: IUserRequest, res) => {
     
     // הוספת המילה למשימה
     await pool.execute(
-      'INSERT INTO WordsInTask (TaskId, WordId) VALUES (?, ?)',
+      'INSERT INTO wordintask (TaskId, WordId) VALUES (?, ?)',
       [TaskId, WordId]
     );
     
@@ -686,13 +686,13 @@ router.post('/words', authMiddleware, async (req: IUserRequest, res: express.Res
         // Create word-task association
         // Skip if association already exists
         const [existingAssoc] = await connection.execute(
-          'SELECT TaskId FROM WordsInTask WHERE TaskId = ? AND WordId = ?',
+          'SELECT TaskId FROM wordintask WHERE TaskId = ? AND WordId = ?',
           [taskId, wordId]
         );
         
         if (!(Array.isArray(existingAssoc) && existingAssoc.length > 0)) {
           await connection.execute(
-            `INSERT INTO WordsInTask 
+            `INSERT INTO wordintask 
              (TaskId, WordId, IsCompleted, Score, Attempts, CreatedAt, UpdatedAt)
              VALUES (?, ?, TRUE, 100, 1, NOW(), NOW())`,
             [taskId, wordId]
@@ -757,13 +757,13 @@ router.put('/tasks/:taskId/complete', authMiddleware, async (req: IUserRequest, 
         for (const wordId of wordIds) {
           // Skip if association already exists
           const [existingAssoc] = await connection.execute(
-            'SELECT TaskId FROM WordsInTask WHERE TaskId = ? AND WordId = ?',
+            'SELECT TaskId FROM wordintask WHERE TaskId = ? AND WordId = ?',
             [taskId, wordId]
           );
           
           if (!(Array.isArray(existingAssoc) && existingAssoc.length > 0)) {
             await connection.execute(
-              `INSERT INTO WordsInTask 
+              `INSERT INTO wordintask 
                (TaskId, WordId, IsCompleted, Score, Attempts, CreatedAt, UpdatedAt)
                VALUES (?, ?, TRUE, 100, 1, NOW(), NOW())`,
               [taskId, wordId]

@@ -224,7 +224,7 @@ router.put('/:taskId/complete', authMiddleware_1.authMiddleware, async (req, res
                 new Date().toISOString()
             ]);
             // Insert word usage records
-            await dbConnection.query('INSERT INTO WordsInTask (TaskId, WordId, AddedAt) VALUES ?', [values]);
+            await dbConnection.query('INSERT INTO wordintask (TaskId, WordId, AddedAt) VALUES ?', [values]);
         }
         await dbConnection.commit();
         res.json({ success: true });
@@ -275,7 +275,7 @@ router.post('/:taskId/words', authMiddleware_1.authMiddleware, async (req, res) 
             new Date().toISOString()
         ]);
         // Insert word usage records
-        await dbConnection.query('INSERT INTO WordsInTask (TaskId, WordId, AddedAt) VALUES ?', [values]);
+        await dbConnection.query('INSERT INTO wordintask (TaskId, WordId, AddedAt) VALUES ?', [values]);
         await dbConnection.commit();
         res.json({ success: true });
     }
