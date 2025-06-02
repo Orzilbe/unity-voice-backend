@@ -501,7 +501,7 @@ router.get('/:topic/:level', authMiddleware, async (req: IUserRequest, res) => {
       SELECT w.WordId, w.Word, w.Translation, w.ExampleUsage, w.TopicName 
       FROM Words w
       JOIN Topics t ON w.TopicName = t.TopicName
-      JOIN Level l ON t.TopicName = l.TopicName
+      JOIN Levels l ON t.TopicName = l.TopicName
       WHERE t.TopicName = ? AND l.Level = ?
     `;
     
