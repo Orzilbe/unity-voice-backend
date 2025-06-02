@@ -1,0 +1,29 @@
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+next/             # תיקיית Build של Next.js
+out/               # תוצרי export (אם עושים `next export`)
+.next/cache/       # מטמון תהליכים
+dist/              # אם אתם מעבירים קבצים ל־dist בבאקאנד
+build/             # תיקיית Build כללית
+coverage/          # דוחות כיסוי (אם אתם מריצים טסטים)
+*.tsbuildinfo      # מטמון Build של TypeScript
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.log
+*.tmp
+*.temp
+*.bak
+*.old
