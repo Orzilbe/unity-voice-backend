@@ -149,7 +149,10 @@ router.patch('/:taskId', authMiddleware_1.authMiddleware, async (req, res) => {
         }
         if (CompletionDate !== undefined) {
             updateSql += 'CompletionDate = ?, ';
-            updateParams.push(CompletionDate);
+            // 🔧 המר ISO string ל-MySQL format  
+            const mysqlDate = new Date(CompletionDate).toISOString().slice(0, 19).replace('T', ' ');
+            updateParams.push(mysqlDate);
+            console.log(`🔄 Converting date from ${CompletionDate} to ${mysqlDate}`);
         }
         // הסרת הפסיק האחרון
         updateSql = updateSql.slice(0, -2);

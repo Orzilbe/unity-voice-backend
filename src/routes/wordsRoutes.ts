@@ -1,3 +1,4 @@
+// src/routes/wordsRoutes.ts
 import express from 'express';
 import { Pool } from 'mysql2/promise';
 import pool from '../models/db';
@@ -147,25 +148,306 @@ router.get('/learned', authMiddleware, async (req: IUserRequest, res) => {
   }
 });
 
-async function saveNewWordsToDatabase(words: any[], connection: any) {
-  try {
-    for (const word of words) {
-      await connection.query(
-        'INSERT INTO words (WordId, Word, Translation, ExampleUsage, TopicName, EnglishLevel) VALUES (?, ?, ?, ?, ?, ?)',
-        [word.WordId, word.Word, word.Translation, word.ExampleUsage, word.TopicName, word.EnglishLevel]
-      );
-    }
-    console.log(`💾 Saved ${words.length} new words to database`);
-  } catch (error) {
-    console.error('❌ Error saving words to database:', error);
-    throw error;
-  }
-}
 /**
- * שמירת מילים למשימה
- * POST /api/word-to-task
+ * קבלת מילים של משימה ספציפית
+ * GET /api/words/in-task?taskId=xxx
+ */
+router.get('/in-task', authMiddleware, async (req: IUserRequest, res) => {
+  console.log("API Words - Getting words for task");
+  try {
+    const taskId = req.query.taskId as string;
+    const userId = req.user?.id;
+    
+    if (!taskId) {
+      console.error('Missing task ID');
+      return res.status(400).json({ error: 'Task ID parameter is required' });
+    }
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' });
+    }
+    
+    const connection = await pool.getConnection();
+    try {
+      // בדיקה אם המשימה שייכת למשתמש
+      const [taskCheck] = await connection.query(
+        'SELECT 1 FROM Tasks WHERE TaskId = ? AND UserId = ?',
+        [taskId, userId]
+      );
+      
+      if (!Array.isArray(taskCheck) || taskCheck.length === 0) {
+        console.error(`Task ${taskId} does not belong to user ${userId}`);
+        return res.status(403).json({ error: 'You do not have permission to view this task' });
+      }
+      
+      // בדיקה איזו טבלה קיימת
+      const tableNames = ['wordintask', 'WordInTask'];
+      let tableToUse = '';
+      
+      for (const tableName of tableNames) {
+        const [result] = await connection.query('SHOW TABLES LIKE ?', [tableName]);
+        if (Array.isArray(result) && result.length > 0) {
+          tableToUse = tableName;
+          break;
+        }
+      }
+      
+      if (!tableToUse) {
+        console.error('No word-task relationship table found');
+        return res.json({ 
+          success: false,
+          error: 'No word-task relationship table found',
+          data: []
+        });
+      }
+      
+      console.log(`Using table ${tableToUse} to get words for task ${taskId}`);
+      
+      // בדיקה אם יש עמודת AddedAt
+      const [columns] = await connection.query(`SHOW COLUMNS FROM ${tableToUse} LIKE 'AddedAt'`);
+      const hasAddedAt = Array.isArray(columns) && columns.length > 0;
+      
+      // שליפת המילים עם פרטים נוספים
+      let query;
+      if (hasAddedAt) {
+        query = `
+          SELECT wit.WordId, wit.AddedAt, w.Word, w.Translation, w.ExampleUsage, w.PartOfSpeech, w.TopicName
+          FROM ${tableToUse} wit
+          JOIN Words w ON wit.WordId = w.WordId
+          WHERE wit.TaskId = ?
+          ORDER BY wit.AddedAt DESC
+        `;
+      } else {
+        query = `
+          SELECT wit.WordId, NOW() as AddedAt, w.Word, w.Translation, w.ExampleUsage, w.PartOfSpeech, w.TopicName
+          FROM ${tableToUse} wit
+          JOIN Words w ON wit.WordId = w.WordId
+          WHERE wit.TaskId = ?
+        `;
+      }
+      
+      const [rows] = await connection.query(query, [taskId]);
+      
+      console.log(`Retrieved ${Array.isArray(rows) ? rows.length : 0} words for task ${taskId}`);
+      res.json({ 
+        success: true, 
+        taskId,
+        data: rows 
+      });
+      
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error getting words for task:', error);
+    res.status(500).json({ 
+      error: 'An error occurred while getting words for task',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * 🆕 הוספת מילים למשימה - עם batch insert מתוקן
+ * POST /api/words/to-task
+ */
+router.post('/to-task', authMiddleware, async (req: IUserRequest, res) => {
+  console.log("🚀 API Words - Adding words to task - START");
+  console.log("📝 Request body:", JSON.stringify(req.body, null, 2));
+  console.log("👤 User ID:", req.user?.id);
+  
+  try {
+    const { taskId, wordIds } = req.body;
+    const userId = req.user?.id;
+    
+    console.log("📋 Extracted data:");
+    console.log("  - taskId:", taskId);
+    console.log("  - wordIds:", wordIds);
+    console.log("  - userId:", userId);
+    
+    if (!taskId) {
+      console.error('❌ Missing task ID');
+      return res.status(400).json({ error: 'Task ID is required' });
+    }
+    
+    if (!Array.isArray(wordIds) || wordIds.length === 0) {
+      console.error('❌ Missing or invalid word IDs');
+      console.log("  - wordIds type:", typeof wordIds);
+      console.log("  - wordIds value:", wordIds);
+      return res.status(400).json({ error: 'Word IDs must be a non-empty array' });
+    }
+    
+    if (!userId) {
+      console.error('❌ Missing user ID');
+      return res.status(401).json({ error: 'User ID not found in token' });
+    }
+    
+    console.log("🔌 Getting database connection...");
+    const connection = await pool.getConnection();
+    console.log("✅ Database connection established");
+    
+    try {
+      await connection.beginTransaction();
+      console.log("🔄 Transaction started");
+      
+      // בדיקה אם המשימה שייכת למשתמש
+      console.log("🔍 Checking task ownership...");
+      const [taskCheck] = await connection.query(
+        'SELECT TaskId, UserId FROM Tasks WHERE TaskId = ? AND UserId = ?',
+        [taskId, userId]
+      );
+      
+      console.log("📊 Task check result:", taskCheck);
+      
+      if (!Array.isArray(taskCheck) || taskCheck.length === 0) {
+        await connection.rollback();
+        console.error(`❌ Task ${taskId} does not belong to user ${userId}`);
+        return res.status(403).json({ error: 'You do not have permission to modify this task' });
+      }
+      
+      console.log("✅ Task ownership verified");
+      
+      // בדיקה ויצירת טבלה אם לא קיימת
+      const tableToUse = 'wordintask';
+      console.log(`🔍 Checking if table ${tableToUse} exists...`);
+      
+      const [tableExists] = await connection.query('SHOW TABLES LIKE ?', [tableToUse]);
+      console.log("📊 Table exists check:", tableExists);
+      
+      if (!Array.isArray(tableExists) || tableExists.length === 0) {
+        console.log(`🔨 Creating table ${tableToUse}...`);
+        await connection.query(`
+          CREATE TABLE ${tableToUse} (
+            TaskId CHAR(36) NOT NULL,
+            WordId CHAR(36) NOT NULL,
+            AddedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (TaskId, WordId)
+          )
+        `);
+        console.log(`✅ Table ${tableToUse} created`);
+      } else {
+        console.log(`✅ Table ${tableToUse} exists`);
+      }
+      
+      // בדיקה אם יש עמודת AddedAt
+      console.log("🔍 Checking AddedAt column...");
+      const [columns] = await connection.query(`SHOW COLUMNS FROM ${tableToUse} LIKE 'AddedAt'`);
+      const hasAddedAt = Array.isArray(columns) && columns.length > 0;
+      console.log("📊 Has AddedAt column:", hasAddedAt);
+      
+      // 🔧 בדוק אם כבר יש מילים במשימה הזו (מניעת duplicate)
+      const [existingWords] = await connection.query(
+        'SELECT COUNT(*) as count FROM wordintask WHERE TaskId = ?',
+        [taskId]
+      );
+      
+      const wordCount = (existingWords as any[])[0]?.count || 0;
+      if (wordCount > 0) {
+        console.log(`⚠️ Task ${taskId} already has ${wordCount} words, skipping duplicate insert`);
+        await connection.commit();
+        return res.json({ 
+          success: true, 
+          message: 'Words already exist for this task',
+          wordsAdded: 0,
+          totalWords: wordIds.length,
+          taskId,
+          tableName: tableToUse
+        });
+      }
+      
+      // 🚀 Batch insert במקום לולאה
+      console.log("💾 Starting batch insert of words...");
+      let successCount = 0;
+      const errors: string[] = [];
+      
+      try {
+        if (hasAddedAt) {
+          // יצירת values array עבור batch insert עם AddedAt
+          const values = wordIds.map(wordId => [taskId, wordId, new Date()]);
+          
+          await connection.query(
+            `INSERT IGNORE INTO ${tableToUse} (TaskId, WordId, AddedAt) VALUES ?`,
+            [values]
+          );
+        } else {
+          // יצירת values array עבור batch insert בלי AddedAt
+          const values = wordIds.map(wordId => [taskId, wordId]);
+          
+          await connection.query(
+            `INSERT IGNORE INTO ${tableToUse} (TaskId, WordId) VALUES ?`,
+            [values]
+          );
+        }
+        
+        // בדיקה כמה מילים בפועל נוספו
+        const [insertResult] = await connection.query(
+          'SELECT COUNT(*) as count FROM wordintask WHERE TaskId = ?',
+          [taskId]
+        );
+        
+        const finalWordCount = (insertResult as any[])[0]?.count || 0;
+        console.log(`✅ Batch insert completed: ${finalWordCount} words in task`);
+        
+        successCount = finalWordCount;
+        
+      } catch (batchError) {
+        console.error('❌ Batch insert failed:', batchError);
+        throw batchError;
+      }
+      
+      await connection.commit();
+      console.log("✅ Transaction committed");
+      
+      console.log("📊 Final results:");
+      console.log(`  - Total words processed: ${wordIds.length}`);
+      console.log(`  - Successfully added: ${successCount}`);
+      console.log(`  - Errors: ${errors.length}`);
+      
+      const response = { 
+        success: true,
+        taskId,
+        wordsAdded: successCount,
+        totalWords: wordIds.length,
+        errors: errors.length > 0 ? errors : undefined,
+        tableName: tableToUse
+      };
+      
+      console.log("📤 Sending response:", response);
+      res.json(response);
+      
+    } catch (error) {
+      await connection.rollback();
+      console.error("❌ Database error:", error);
+      throw error;
+    } finally {
+      connection.release();
+      console.log("🔌 Database connection released");
+    }
+  } catch (error) {
+    console.error('💥 Fatal error adding words to task:', error);
+    console.error('💥 Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    });
+    
+    res.status(500).json({ 
+      error: 'An error occurred while adding words to task',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+  
+  console.log("🏁 API Words - Adding words to task - END");
+});
+
+/**
+ * 📝 שמירת מילים למשימה (הפונקציה הקיימת - לתאימות אחורה)
+ * POST /api/words/word-to-task
  */
 router.post('/word-to-task', authMiddleware, async (req: IUserRequest, res) => {
+  console.log("🚀 API Words - Legacy word-to-task endpoint");
+  console.log("📝 Request body:", JSON.stringify(req.body, null, 2));
+  
   try {
     const { mappings } = req.body; // array של {WordId, TaskId}
     
@@ -192,4 +474,20 @@ router.post('/word-to-task', authMiddleware, async (req: IUserRequest, res) => {
     res.status(500).json({ error: 'Failed to save mappings' });
   }
 });
+
+async function saveNewWordsToDatabase(words: any[], connection: any) {
+  try {
+    for (const word of words) {
+      await connection.query(
+        'INSERT INTO words (WordId, Word, Translation, ExampleUsage, TopicName, EnglishLevel) VALUES (?, ?, ?, ?, ?, ?)',
+        [word.WordId, word.Word, word.Translation, word.ExampleUsage, word.TopicName, word.EnglishLevel]
+      );
+    }
+    console.log(`💾 Saved ${words.length} new words to database`);
+  } catch (error) {
+    console.error('❌ Error saving words to database:', error);
+    throw error;
+  }
+}
+
 export default router;

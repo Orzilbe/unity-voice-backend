@@ -137,6 +137,23 @@ router.post('/register', async (req, res, next) => {
         next(error);
     }
 });
+// Add GET handler for register endpoint to provide helpful error message
+router.get('/register', (req, res) => {
+    res.status(405).json({
+        message: 'Method not allowed',
+        details: 'Registration requires a POST request with user data. GET requests are not supported for registration.',
+        expectedMethod: 'POST',
+        expectedBody: {
+            email: 'string',
+            firstName: 'string',
+            lastName: 'string',
+            phoneNumber: 'string',
+            password: 'string',
+            englishLevel: 'beginner|intermediate|advanced',
+            ageRange: 'string'
+        }
+    });
+});
 router.get('/debug-user', async (req, res) => {
     const { email } = req.query;
     if (!email) {

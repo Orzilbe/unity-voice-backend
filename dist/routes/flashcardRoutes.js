@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// apps/api/src/routes/flashcardRoutes.ts
+// unity-voice-backend/src/routes/flashcardRoutes.ts
 const express_1 = __importDefault(require("express"));
 const db_1 = require("../lib/db");
 const authMiddleware_1 = require("../middleware/authMiddleware");
@@ -456,7 +456,7 @@ router.get('/:topic/:level', authMiddleware_1.authMiddleware, async (req, res) =
       SELECT w.WordId, w.Word, w.Translation, w.ExampleUsage, w.TopicName 
       FROM Words w
       JOIN Topics t ON w.TopicName = t.TopicName
-      JOIN Level l ON t.TopicName = l.TopicName
+      JOIN Levels l ON t.TopicName = l.TopicName
       WHERE t.TopicName = ? AND l.Level = ?
     `;
         // אם המשתמש מחובר, סנן מילים שכבר למד
