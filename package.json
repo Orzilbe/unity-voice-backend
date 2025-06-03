@@ -27,7 +27,8 @@
     "mysql2": "^3.14.1",
     "openai": "^4.104.0",
     "recharts": "^2.15.3",
-    "sequelize": "^6.37.7"
+    "sequelize": "^6.37.7",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

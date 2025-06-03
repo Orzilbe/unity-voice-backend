@@ -1,219 +1,141 @@
-// apps/web/src/app/services/openai.ts
-
-import OpenAI from 'openai';
+// src/services/openai.ts (Backend version - Fixed Azure OpenAI)
+import { AzureOpenAI } from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 
-// Log environment variables for debugging (redacted for security)
-console.log('AZURE_OPENAI_ENDPOINT config:', process.env.AZURE_OPENAI_ENDPOINT ? 'Set (value hidden)' : 'Not set');
-console.log('AZURE_OPENAI_API_KEY config:', process.env.AZURE_OPENAI_API_KEY ? 'Set (value hidden)' : 'Not set');
-console.log('AZURE_OPENAI_DEPLOYMENT_NAME config:', process.env.AZURE_OPENAI_DEPLOYMENT_NAME);
+// בדיקת משתני סביבה
+console.log('AZURE_OPENAI_ENDPOINT:', process.env.AZURE_OPENAI_ENDPOINT ? '✅ set' : '❌ missing');
+console.log('AZURE_OPENAI_API_KEY:', process.env.AZURE_OPENAI_API_KEY ? '✅ set' : '❌ missing');
+console.log('AZURE_OPENAI_DEPLOYMENT_NAME:', process.env.AZURE_OPENAI_DEPLOYMENT_NAME);
 
-// Create OpenAI client with Azure configuration
-const openai = new OpenAI({
+// יצירת לקוח Azure OpenAI - תיקון להגדרות נכונות
+const client = new AzureOpenAI({
+  endpoint: process.env.AZURE_OPENAI_ENDPOINT || '',
   apiKey: process.env.AZURE_OPENAI_API_KEY || '',
-  baseURL: process.env.AZURE_OPENAI_ENDPOINT || '',
-  defaultQuery: { 'api-version': '2024-02-15-preview' },
-  defaultHeaders: { 'api-key': process.env.AZURE_OPENAI_API_KEY || '' }
+  apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-04-01-preview'
 });
 
 export interface GeneratedWord {
-  WordId?: string;
+  WordId: string;
   Word: string;
   Translation: string;
   ExampleUsage: string;
-  TopicName?: string;
-  EnglishLevel?: string;
 }
 
-/**
- * Generate words using OpenAI based on topic and English level
- */
 export async function generateWords(englishLevel: string, topicName: string): Promise<GeneratedWord[]> {
-  console.log(`Generating words for topic: ${topicName}, level: ${englishLevel}`);
-  
-  // Create a prompt based on the topic and level
-  const prompt = createPromptForTopic(topicName, englishLevel);
-  
+  console.log(`generateWords() called for topic="${topicName}", englishLevel="${englishLevel}"`);
+
+  // בדיקת משתני סביבה חיוניים
+  if (!process.env.AZURE_OPENAI_ENDPOINT || !process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_DEPLOYMENT_NAME) {
+    console.error('Missing Azure OpenAI environment variables');
+    return [];
+  }
+
+  const basePrompt = createPromptForTopic(topicName, englishLevel);
+
   try {
-    console.log('Making Azure OpenAI API request:');
-    console.log('- Endpoint:', process.env.AZURE_OPENAI_ENDPOINT);
-    console.log('- Deployment:', process.env.AZURE_OPENAI_DEPLOYMENT_NAME);
+    console.log('Calling Azure OpenAI...');
     
-    // Send request to OpenAI
-    const completion = await openai.chat.completions.create({
-      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-35-turbo",
+    const completion = await client.chat.completions.create({
+      model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
       messages: [
-        { role: "system", content: "You are a precise language learning assistant creating vocabulary words." },
-        { role: "user", content: prompt }
+        { role: 'system', content: 'You are a precise language learning assistant creating vocabulary words.' },
+        { role: 'user', content: basePrompt }
       ],
       temperature: 0.7,
       max_tokens: 1000
     });
-    
-    // Process the response
+
     const responseText = completion.choices[0].message?.content?.trim() || '';
-    console.log('Azure OpenAI API response received successfully');
+    console.log('OpenAI response received:', responseText.substring(0, 200) + '...');
+
+    // חילוץ JSON מהתשובה
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    const jsonString = jsonMatch ? jsonMatch[0] : responseText;
     
-    // Parse the JSON response
     let wordsData;
     try {
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      const jsonString = jsonMatch ? jsonMatch[0] : responseText;
       wordsData = JSON.parse(jsonString);
-    } catch (error) {
-      console.error('Error parsing OpenAI response:', error);
-      console.error('Raw response text:', responseText);
+    } catch (err) {
+      console.error('Failed to parse JSON from OpenAI response:', err);
+      console.error('Raw response:', responseText);
       return [];
     }
-    
-    // Convert to GeneratedWord format
+
+    // המרה לפורמט GeneratedWord
     const generatedWords: GeneratedWord[] = wordsData.map((item: any) => ({
       WordId: uuidv4(),
       Word: item.word,
       Translation: item.translation,
-      ExampleUsage: item.example || '',
-      TopicName: topicName,
-      EnglishLevel: englishLevel
+      ExampleUsage: item.example || item.ExampleUsage || ''
     }));
-    
-    console.log(`Successfully generated ${generatedWords.length} words`);
+
+    console.log(`generateWords() returning ${generatedWords.length} items`);
     return generatedWords;
-  } catch (error) {
-    console.error('==== Error generating words with Azure OpenAI ====');
     
-    // Log detailed error information
-    if (error instanceof Error) {
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-      
-      // Handle specific OpenAI errors
-      if ('status' in (error as any)) {
-        console.error('Status code:', (error as any).status);
-      }
-      
-      if ('response' in (error as any) && (error as any).response) {
-        const response = (error as any).response;
-        console.error('Response status:', response.status);
-        console.error('Response headers:', response.headers);
-        console.error('Response data:', response.data);
-      }
-      
-      // Check for common Azure OpenAI issues
-      if (error.message.includes('Resource not found')) {
-        console.error('DIAGNOSIS: The Azure OpenAI deployment name or endpoint may be incorrect');
-        console.error('Check that the deployment name matches exactly what is in the Azure portal');
-      } else if (error.message.includes('401')) {
-        console.error('DIAGNOSIS: Authentication failed, check your API key');
-      } else if (error.message.includes('429')) {
-        console.error('DIAGNOSIS: Rate limit exceeded, consider implementing retry logic');
-      }
-    } else {
-      console.error('Unknown error type:', error);
+  } catch (err: any) {
+    console.error('Error calling OpenAI:', err);
+    
+    // פירוט שגיאות ספציפיות
+    if (err.status === 401) {
+      console.error('🔑 Authentication failed - check your API key and endpoint');
+      console.error('Make sure your Azure OpenAI resource is active and the key is correct');
+    } else if (err.status === 404) {
+      console.error('🎯 Resource not found - check deployment name and endpoint');
+      console.error('Deployment name should match exactly what is in Azure portal');
+    } else if (err.status === 429) {
+      console.error('⏱️ Rate limit exceeded');
     }
     
-    console.error('============================================');
     return [];
   }
 }
 
 /**
- * Create topic-specific prompt for OpenAI
+ * יצירת prompt ספציפי לנושא
  */
 function createPromptForTopic(topicName: string, englishLevel: string): string {
-  
-  const basePrompt = `Generate 7 unique words related to ${topicName}, appropriate for ${englishLevel} level English learners.
-    For each word, provide:
-    1. An English word appropriate for ${englishLevel} level
-    2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context
-    3. A clear example sentence showing usage
-     
-    Respond as a JSON array with these fields:
-    [{
-      "word": "English word",
-      "translation": "Hebrew translation",
-      "example": "A clear example sentence using the word"
-    }, ...]
+  const basePrompt = `Generate 7 unique English words related to "${topicName}", appropriate for ${englishLevel} level English learners.
+For each word, provide:
+1. The English word
+2. Hebrew translation (accurate, in context)
+3. A clear example sentence in English using the word
+
+Respond as a JSON array with fields: 
+[{ "word": "...", "translation": "...", "example": "..." }, ...]`;
+
+  // הוספת הדרכה ספציפית לנושא
+  switch (topicName.toLowerCase()) {
+    case 'history and heritage':
+      return `${basePrompt}
+
+Focus on historical events, cultural heritage, and historical terminology suitable for ${englishLevel} learners.`;
     
-    IMPORTANT: 
-    - Ensure the difficulty matches ${englishLevel} level English learners
-    - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context
-    - Use natural, conversational example sentences
-    - Use real, precise words (not phrases)`;
-  
-  // Add topic-specific guidance
-  switch (topicName) {
-    case "Society and Multiculturalism":
-    case "Society And Multiculturalism":
+    case 'economy and entrepreneurship':
       return `${basePrompt}
-        
-        Focus on:
-        - Cultural diversity terms
-        - Social integration concepts
-        - Community and identity words
-        - Collective living vocabulary
-        - Cross-cultural communication`;
-        
-    case "Diplomacy and International Relations":
-    case "Diplomacy And International Relations":
+
+Focus on business, finance, startup, and economic terms suitable for ${englishLevel} learners.`;
+    
+    case 'diplomacy and international relations':
       return `${basePrompt}
-        
-        Focus on:
-        - Diplomatic negotiations
-        - International conflict resolution
-        - Geopolitical strategies
-        - Cross-cultural communication
-        - Israeli diplomatic roles`;
-        
-    case "Economy and Entrepreneurship":
-    case "Economy And Entrepreneurship":
+
+Focus on diplomatic, political, and international relations terms suitable for ${englishLevel} learners.`;
+    
+    case 'environment and sustainability':
       return `${basePrompt}
-        
-        Focus on:
-        - Startup ecosystem
-        - Economic innovation
-        - Financial technologies
-        - Entrepreneurial strategies
-        - Business development`;
-        
-    case "Environment and Sustainability":
-    case "Environment And Sustainability":
+
+Focus on environmental, climate, and sustainability terms suitable for ${englishLevel} learners.`;
+    
+    case 'innovation and technology':
       return `${basePrompt}
-        
-        Focus on:
-        - Environmental conservation
-        - Climate change
-        - Sustainable development
-        - Environmental policies
-        - Renewable energy`;
-        
-    case "Innovation and Technology":
-    case "Innovation And Technology":
+
+Focus on technology, innovation, and digital terms suitable for ${englishLevel} learners.`;
+    
+    case 'society and multiculturalism':
       return `${basePrompt}
-        
-        Focus on:
-        - Technological breakthroughs
-        - Digital innovation
-        - AI and computing
-        - Tech startups
-        - Israeli innovation ecosystem`;
-        
-    case "History and Heritage":
-    case "History And Heritage":
-      return `${basePrompt}
-        
-        Focus on:
-        - Historical events
-        - Cultural heritage
-        - Historical places
-        - Historical figures
-        - Jewish and Israeli history`;
-        
+
+Focus on social, cultural diversity, and community terms suitable for ${englishLevel} learners.`;
+    
     default:
       return basePrompt;
   }
 }
-
-export default {
-  generateWords
-};

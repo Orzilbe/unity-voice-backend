@@ -1,4 +1,4 @@
-// src/routes/userWordsRoutes.ts
+//backend/src/routes/userWordsRoutes.ts
 import express from 'express';
 import { Pool } from 'mysql2/promise';
 import pool from '../models/db';

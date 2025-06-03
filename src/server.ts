@@ -1,4 +1,4 @@
-// apps/api/src/server.ts
+// apps/api/src/server.ts - תיקון עם סדר נכון של routes
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -21,6 +21,16 @@ import postRoutes from './routes/postRoutes';
 import commentRoutes from './routes/commentRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 
+// ✅ נסה לטעון את wordsToTaskRoutes - עם טיפול בשגיאות
+let wordsToTaskRoutes: any = null;
+try {
+  wordsToTaskRoutes = require('./routes/wordsToTaskRoutes').default;
+  console.log('✅ wordsToTaskRoutes loaded successfully');
+} catch (error) {
+  console.error('❌ Failed to load wordsToTaskRoutes:', error);
+  console.log('⚠️ Server will continue without wordsToTaskRoutes');
+}
+
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
 import { connectToDatabase } from './lib/db';
@@ -30,7 +40,7 @@ dotenv.config();
 
 // Create Express app
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(helmet()); // Adds security headers
@@ -86,7 +96,49 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
-// API Routes
+// Debug route - הוסף לפני כל ה-routes כדי שיעבוד
+app.get('/api/debug/routes', (req: Request, res: Response) => {
+  const routes: string[] = [];
+  
+  // איסוף כל ה-routes הרשומים
+  function extractRoutes(stack: any[], prefix = '') {
+    stack.forEach((layer: any) => {
+      if (layer.route) {
+        // Route ישיר
+        const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
+        routes.push(`${methods} ${prefix}${layer.route.path}`);
+      } else if (layer.name === 'router' && layer.handle.stack) {
+        // Router נוסף
+        const routerPrefix = layer.regexp.source
+          .replace('^\\\/', '')
+          .replace('\\/?(?=\\\\/|$)', '')
+          .replace(/\\\//g, '/');
+        extractRoutes(layer.handle.stack, prefix + '/' + routerPrefix);
+      }
+    });
+  }
+  
+  extractRoutes(app._router.stack);
+  
+  const wordRoutes = routes.filter((route: string) => 
+    route.toLowerCase().includes('words')
+  );
+  
+  res.json({
+    message: 'Unity Voice API Routes Debug',
+    totalRoutes: routes.length,
+    routes: routes.sort(),
+    wordRoutes: wordRoutes,
+    wordsToTaskRoutesLoaded: !!wordsToTaskRoutes,
+    serverInfo: {
+      timestamp: new Date().toISOString(),
+      nodeEnv: process.env.NODE_ENV,
+      port: PORT
+    }
+  });
+});
+
+// API Routes - ✅ סדר נכון וללא כפילויות
 app.use('/api/auth', authRoutes);
 app.use('/api/topics', topicsRoutes);
 app.use('/api/user', userRoutes);
@@ -96,7 +148,17 @@ app.use('/api/user-words', userWordsRoutes);
 app.use('/api/interactive-sessions', interactiveSessionRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/questions', questionRoutes);
-app.use('/api/words', wordsRoutes);
+
+// ✅ Words routes - סדר חשוב! wordsToTaskRoutes לפני wordsRoutes
+if (wordsToTaskRoutes) {
+  console.log('📝 Registering wordsToTaskRoutes at /api/words');
+  app.use('/api/words', wordsToTaskRoutes); // רק אם הקובץ קיים
+} else {
+  console.log('⚠️ wordsToTaskRoutes not available - skipping registration');
+}
+
+app.use('/api/words', wordsRoutes); // ✅ רק פעם אחת!
+
 app.use('/api/user-profile', userProfileRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
@@ -104,11 +166,13 @@ app.use('/api/dashboard', dashboardRoutes);
 
 // 404 handler for unmatched routes
 app.use('*', (req: Request, res: Response) => {
+  console.log(`❌ 404 - Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     message: 'Route not found',
     path: req.originalUrl,
     method: req.method,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    availableDebugInfo: 'Visit /api/debug/routes for available routes'
   });
 });
 
@@ -121,6 +185,8 @@ initializeDatabase().then(() => {
     console.log(`🚀 Unity Voice API server is running on port ${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📍 Available at: http://localhost:${PORT}`);
+    console.log(`🔍 Debug routes at: http://localhost:${PORT}/api/debug/routes`);
+    console.log(`📝 wordsToTaskRoutes loaded: ${!!wordsToTaskRoutes ? 'Yes' : 'No'}`);
   });
 }).catch(error => {
   console.error('❌ Failed to initialize database:', error);
