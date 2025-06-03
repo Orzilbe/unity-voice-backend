@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// apps/api/src/server.ts
+// apps/api/src/server.ts - תיקון עם סדר נכון של routes
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
@@ -24,6 +24,16 @@ const userProfileRoutes_1 = __importDefault(require("./routes/userProfileRoutes"
 const postRoutes_1 = __importDefault(require("./routes/postRoutes"));
 const commentRoutes_1 = __importDefault(require("./routes/commentRoutes"));
 const dashboardRoutes_1 = __importDefault(require("./routes/dashboardRoutes"));
+// ✅ נסה לטעון את wordsToTaskRoutes - עם טיפול בשגיאות
+let wordsToTaskRoutes = null;
+try {
+    wordsToTaskRoutes = require('./routes/wordsToTaskRoutes').default;
+    console.log('✅ wordsToTaskRoutes loaded successfully');
+}
+catch (error) {
+    console.error('❌ Failed to load wordsToTaskRoutes:', error);
+    console.log('⚠️ Server will continue without wordsToTaskRoutes');
+}
 // Import middleware
 const errorHandler_1 = require("./middleware/errorHandler");
 const db_1 = require("./lib/db");
@@ -31,7 +41,7 @@ const db_1 = require("./lib/db");
 dotenv_1.default.config();
 // Create Express app
 const app = (0, express_1.default)();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 // Middleware
 app.use((0, helmet_1.default)()); // Adds security headers
 app.use((0, cors_1.default)({
@@ -82,7 +92,43 @@ app.get('/api/health', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
-// API Routes
+// Debug route - הוסף לפני כל ה-routes כדי שיעבוד
+app.get('/api/debug/routes', (req, res) => {
+    const routes = [];
+    // איסוף כל ה-routes הרשומים
+    function extractRoutes(stack, prefix = '') {
+        stack.forEach((layer) => {
+            if (layer.route) {
+                // Route ישיר
+                const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
+                routes.push(`${methods} ${prefix}${layer.route.path}`);
+            }
+            else if (layer.name === 'router' && layer.handle.stack) {
+                // Router נוסף
+                const routerPrefix = layer.regexp.source
+                    .replace('^\\\/', '')
+                    .replace('\\/?(?=\\\\/|$)', '')
+                    .replace(/\\\//g, '/');
+                extractRoutes(layer.handle.stack, prefix + '/' + routerPrefix);
+            }
+        });
+    }
+    extractRoutes(app._router.stack);
+    const wordRoutes = routes.filter((route) => route.toLowerCase().includes('words'));
+    res.json({
+        message: 'Unity Voice API Routes Debug',
+        totalRoutes: routes.length,
+        routes: routes.sort(),
+        wordRoutes: wordRoutes,
+        wordsToTaskRoutesLoaded: !!wordsToTaskRoutes,
+        serverInfo: {
+            timestamp: new Date().toISOString(),
+            nodeEnv: process.env.NODE_ENV,
+            port: PORT
+        }
+    });
+});
+// API Routes - ✅ סדר נכון וללא כפילויות
 app.use('/api/auth', auth_1.default);
 app.use('/api/topics', topicsRoutes_1.default);
 app.use('/api/user', userRoutes_1.default);
@@ -92,18 +138,28 @@ app.use('/api/user-words', userWordsRoutes_1.default);
 app.use('/api/interactive-sessions', interactiveSessionRoutes_1.default);
 app.use('/api/flashcards', flashcardRoutes_1.default);
 app.use('/api/questions', questionRoutes_1.default);
-app.use('/api/words', wordsRoutes_1.default);
+// ✅ Words routes - סדר חשוב! wordsToTaskRoutes לפני wordsRoutes
+if (wordsToTaskRoutes) {
+    console.log('📝 Registering wordsToTaskRoutes at /api/words');
+    app.use('/api/words', wordsToTaskRoutes); // רק אם הקובץ קיים
+}
+else {
+    console.log('⚠️ wordsToTaskRoutes not available - skipping registration');
+}
+app.use('/api/words', wordsRoutes_1.default); // ✅ רק פעם אחת!
 app.use('/api/user-profile', userProfileRoutes_1.default);
 app.use('/api/posts', postRoutes_1.default);
 app.use('/api/comments', commentRoutes_1.default);
 app.use('/api/dashboard', dashboardRoutes_1.default);
 // 404 handler for unmatched routes
 app.use('*', (req, res) => {
+    console.log(`❌ 404 - Route not found: ${req.method} ${req.originalUrl}`);
     res.status(404).json({
         message: 'Route not found',
         path: req.originalUrl,
         method: req.method,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        availableDebugInfo: 'Visit /api/debug/routes for available routes'
     });
 });
 // Error handling middleware (must be last)
@@ -114,6 +170,8 @@ app.use(errorHandler_1.errorHandler);
         console.log(`🚀 Unity Voice API server is running on port ${PORT}`);
         console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
         console.log(`📍 Available at: http://localhost:${PORT}`);
+        console.log(`🔍 Debug routes at: http://localhost:${PORT}/api/debug/routes`);
+        console.log(`📝 wordsToTaskRoutes loaded: ${!!wordsToTaskRoutes ? 'Yes' : 'No'}`);
     });
 }).catch(error => {
     console.error('❌ Failed to initialize database:', error);
