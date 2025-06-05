@@ -1,13 +1,11 @@
 import express from 'express';
+import { IUserRequest } from '../types/auth';
 import { Pool } from 'mysql2/promise';
 import pool from '../models/db';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { TokenPayload } from '../types/auth';
-
-// Define the user request interface
-interface IUserRequest extends express.Request {
-  user?: TokenPayload;
-}
+import DatabaseConnection from '../config/database';
+import { errorHandler } from '../middleware/errorHandler';
 
 const router = express.Router();
 

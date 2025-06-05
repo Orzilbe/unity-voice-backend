@@ -1,14 +1,13 @@
 //backend/src/routes/userWordsRoutes.ts
 import express from 'express';
+import { IUserRequest } from '../types/auth';
 import { Pool } from 'mysql2/promise';
 import pool from '../models/db';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { TokenPayload } from '../types/auth';
 import { v4 as uuidv4 } from 'uuid';
-
-interface IUserRequest extends express.Request {
-  user?: TokenPayload;
-}
+import DatabaseConnection from '../config/database';
+import { errorHandler } from '../middleware/errorHandler';
 
 const router = express.Router();
 

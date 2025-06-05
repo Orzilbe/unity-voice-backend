@@ -1,13 +1,9 @@
 // apps/api/src/routes/topicsRoutes.ts
 import express from 'express';
-import pool from '../models/db';
+import { IUserRequest } from '../types/auth';
 import { authMiddleware } from '../middleware/authMiddleware';
-import { TokenPayload } from '../types/auth';
-
-// Define the user request interface
-interface IUserRequest extends express.Request {
-  user?: TokenPayload;
-}
+import pool from '../models/db';
+import { errorHandler } from '../middleware/errorHandler';
 
 const router = express.Router();
 
@@ -22,21 +18,17 @@ router.get('/', authMiddleware, async (req: IUserRequest, res) => {
     const connection = await pool.getConnection();
     
     try {
-      const [topics] = await connection.execute(
-        'SELECT TopicName, TopicHe, Icon FROM Topics ORDER BY TopicName'
+      const [rows] = await connection.query(
+        'SELECT * FROM Topics ORDER BY TopicName'
       );
       
-      console.log(`Retrieved ${(topics as any[]).length} topics`);
-      return res.json(topics);
+      res.json(rows);
     } finally {
       connection.release();
     }
   } catch (error) {
-    console.error('Error fetching topics:', error);
-    return res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    });
+    console.error('Error getting topics:', error);
+    res.status(500).json({ error: 'Failed to get topics' });
   }
 });
 

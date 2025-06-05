@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authMiddleware = void 0;
+exports.authenticateToken = exports.authMiddleware = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const errorHandler_1 = require("./errorHandler");
 const authMiddleware = (req, res, next) => {
@@ -21,7 +21,11 @@ const authMiddleware = (req, res, next) => {
             throw new Error('JWT secret is not defined');
         }
         const decoded = jsonwebtoken_1.default.verify(token, secret);
-        req.user = decoded;
+        // Ensure we have userId in the request for the new APIs
+        req.user = {
+            ...decoded,
+            userId: decoded.userId || decoded.id?.toString() || decoded.email
+        };
         next();
     }
     catch (error) {
@@ -35,3 +39,5 @@ const authMiddleware = (req, res, next) => {
     }
 };
 exports.authMiddleware = authMiddleware;
+// Export with the name that the new route files expect
+exports.authenticateToken = exports.authMiddleware;

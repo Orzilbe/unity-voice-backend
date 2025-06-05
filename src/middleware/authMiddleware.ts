@@ -1,23 +1,10 @@
-// apps/api/src/middleware/authMiddleware.ts
-import { Request, Response, NextFunction } from 'express';
+// unity-voice-backend/src/middleware/authMiddleware.ts (CLEAN VERSION - MIDDLEWARE ONLY)
+import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './errorHandler';
+import { TokenPayload, IUserRequest } from '../types/auth';
 
-interface TokenPayload {
-  id: number;
-  email: string;
-  role?: string;
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: TokenPayload;
-    }
-  }
-}
-
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -38,7 +25,13 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
     }
 
     const decoded = jwt.verify(token, secret) as TokenPayload;
-    req.user = decoded;
+    
+    // Ensure we have userId in the request for the new APIs
+    req.user = {
+      ...decoded,
+      userId: decoded.userId || decoded.id?.toString() || decoded.email
+    };
+    
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
@@ -50,3 +43,6 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
     return next(new AppError('Authentication failed', 500));
   }
 };
+
+// Export with the name that the new route files expect
+export const authenticateToken = authMiddleware;

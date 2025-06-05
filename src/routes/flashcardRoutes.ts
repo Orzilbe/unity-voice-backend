@@ -1,20 +1,12 @@
 // unity-voice-backend/src/routes/flashcardRoutes.ts
 import express from 'express';
+import { IUserRequest } from '../types/auth';
 import { getDbPool } from '../lib/db';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { errorHandler } from '../middleware/errorHandler';
 import { IUser } from '../models/User';
 import { AzureOpenAI } from 'openai';
 import { v4 as uuidv4 } from 'uuid';
-
-interface TokenPayload {
-  id: number;
-  email: string;
-  role?: string;
-}
-
-interface IUserRequest extends express.Request {
-  user?: TokenPayload;
-}
 
 const openai = new AzureOpenAI({
   apiKey: process.env.AZURE_OPENAI_API_KEY,

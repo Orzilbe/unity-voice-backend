@@ -1,11 +1,13 @@
-// unity-voice-backend/src/routes/auth.ts (CLEAN VERSION - ROUTES ONLY)
+// unity-voice-backend/src/routes/authRoutes.ts
 import express, { Request, Response, NextFunction } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import { UserRole, AgeRange, EnglishLevel } from '../models/User';
 import validator from 'validator';
 import bcrypt from 'bcryptjs';
 import DatabaseConnection from '../config/database';
+import { errorHandler } from '../middleware/errorHandler';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { initializeUserLevels } from '../services/userLevelService';
 import { IUserRequest } from '../types/auth';
@@ -230,4 +232,4 @@ router.get('/debug-user', async (req, res) => {
   }
 });
 
-export default router;
+export default router; 

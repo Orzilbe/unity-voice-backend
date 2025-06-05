@@ -1,13 +1,12 @@
 // apps/api/src/routes/wordsToTaskRoutes.ts
 import express from 'express';
+import { IUserRequest } from '../types/auth';
 import { authMiddleware } from '../middleware/authMiddleware';
-import { TokenPayload } from '../types/auth';
+import { v4 as uuidv4 } from 'uuid';
 import { addWordsToTask } from '../services/taskService';
 import { getDbPool } from '../lib/db';
-
-interface IUserRequest extends express.Request {
-  user?: TokenPayload;
-}
+import DatabaseConnection from '../config/database';
+import { errorHandler } from '../middleware/errorHandler';
 
 const router = express.Router();
 

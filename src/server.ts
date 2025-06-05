@@ -1,4 +1,4 @@
-// apps/api/src/server.ts - תיקון עם סדר נכון של routes
+// unity-voice-backend/src/server.ts 
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import { initializeDatabase } from './models';
 
 // Import routes
-import authRoutes from './routes/auth';
+import authRoutes from './routes/authRoutes';
 import topicsRoutes from './routes/topicsRoutes';
 import userRoutes from './routes/userRoutes';
 import diagnosticRoutes from './routes/diagnosticRoutes';
@@ -20,6 +20,7 @@ import userProfileRoutes from './routes/userProfileRoutes';
 import postRoutes from './routes/postRoutes';
 import commentRoutes from './routes/commentRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
+import quizRoutes from './routes/quizRoutes';
 
 // ✅ נסה לטעון את wordsToTaskRoutes - עם טיפול בשגיאות
 let wordsToTaskRoutes: any = null;
@@ -34,6 +35,7 @@ try {
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
 import { connectToDatabase } from './lib/db';
+import feedbackRoutes from './routes/feedbackRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -148,7 +150,8 @@ app.use('/api/user-words', userWordsRoutes);
 app.use('/api/interactive-sessions', interactiveSessionRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/questions', questionRoutes);
-
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/quiz', quizRoutes); 
 // ✅ Words routes - סדר חשוב! wordsToTaskRoutes לפני wordsRoutes
 if (wordsToTaskRoutes) {
   console.log('📝 Registering wordsToTaskRoutes at /api/words');
@@ -158,11 +161,10 @@ if (wordsToTaskRoutes) {
 }
 
 app.use('/api/words', wordsRoutes); // ✅ רק פעם אחת!
-
 app.use('/api/user-profile', userProfileRoutes);
-app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/post-task', postRoutes);
 
 // 404 handler for unmatched routes
 app.use('*', (req: Request, res: Response) => {

@@ -1,15 +1,15 @@
 //backend/src/routes/taskRoutes.ts
-import express from 'express';
+import express, { Response } from 'express'; // ← הוסף Response לייבוא
+import { IUserRequest } from '../types/auth';
 import { Pool } from 'mysql2/promise';
 import pool from '../models/db';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { v4 as uuidv4 } from 'uuid';
 import { TokenPayload } from '../types/auth';
-
-// Define the user request interface
-interface IUserRequest extends express.Request {
-  user?: TokenPayload;
-}
+import DatabaseConnection from '../config/database';
+import Task from '../models/Task';
+import Word from '../models/Word';
+import { errorHandler } from '../middleware/errorHandler';
 
 const router = express.Router();
 
@@ -17,7 +17,7 @@ const router = express.Router();
  * יצירת משימה חדשה
  * POST /api/tasks
  */
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
   try {
     console.log('Creating new task with data:', req.body);
     const { UserId, TopicName, Level, TaskType, TaskScore = 0, StartDate } = req.body;
@@ -36,7 +36,7 @@ router.post('/', authMiddleware, async (req, res) => {
       });
     }
     
-    // ודא שהמשתמש שמוטמע בטוקן תואם לשדה UserId
+    // ודא שהמשתמש שמוטמע בטוכן תואם לשדה UserId
     if (req.user?.id && req.user.id.toString() !== UserId) {
       console.warn(`User ID mismatch: ${req.user.id} vs ${UserId}`);
       return res.status(403).json({
@@ -138,7 +138,7 @@ router.post('/', authMiddleware, async (req, res) => {
  * עדכון משימה קיימת
  * PATCH /api/tasks/:taskId
  */
-router.patch('/:taskId', authMiddleware, async (req, res) => {
+router.patch('/:taskId', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
   try {
     console.log(`Updating task ${req.params.taskId} with data:`, req.body);
     const { taskId } = req.params;
@@ -240,7 +240,7 @@ router.patch('/:taskId', authMiddleware, async (req, res) => {
 /**
  * PUT /api/tasks/:taskId/complete - Complete a task and record word usage
  */
-router.put('/:taskId/complete', authMiddleware, async (req: IUserRequest, res: express.Response) => {
+router.put('/:taskId/complete', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
   let dbConnection;
   try {
     dbConnection = await pool.getConnection();
@@ -307,7 +307,7 @@ router.put('/:taskId/complete', authMiddleware, async (req: IUserRequest, res: e
 /**
  * POST /api/tasks/:taskId/words - Record word usage in a task
  */
-router.post('/:taskId/words', authMiddleware, async (req: IUserRequest, res: express.Response) => {
+router.post('/:taskId/words', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
   let dbConnection;
   try {
     dbConnection = await pool.getConnection();
@@ -369,7 +369,7 @@ router.post('/:taskId/words', authMiddleware, async (req: IUserRequest, res: exp
  * קבלת משימות לפי משתמש
  * GET /api/tasks/user/:userId
  */
-router.get('/user/:userId', authMiddleware, async (req, res) => {
+router.get('/user/:userId', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
   try {
     const { userId } = req.params;
     
@@ -411,7 +411,7 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
  * קבלת משימות של המשתמש הנוכחי
  * GET /api/tasks
  */
-router.get('/', authMiddleware, async (req: IUserRequest, res) => {
+router.get('/', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
   try {
     console.log('GET /api/tasks - Fetching current user tasks');
     

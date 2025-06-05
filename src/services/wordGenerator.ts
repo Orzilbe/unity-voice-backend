@@ -1,4 +1,4 @@
-// apps/web/src/app/services/wordGenerator.ts
+// /backend/src/services/wordGenerator.ts
 
 import { AzureOpenAI } from 'openai';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,10 +30,14 @@ export interface GeneratedWord {
   EnglishLevel?: string;
 }
 
-export async function generateWords(englishLevel: string, topicName: string): Promise<GeneratedWord[]> {
+export async function generateWords(
+  englishLevel: string, 
+  topicName: string, 
+  existingWords: string[] = []
+): Promise<GeneratedWord[]> {
   console.log(`Generating words for topic: ${topicName}, level: ${englishLevel}`);
   
-  const prompt = createPromptForTopic(topicName, englishLevel);
+  const prompt = createPromptForTopic(topicName, englishLevel, existingWords);
   
   try {
     console.log('Making Azure OpenAI API request:');
@@ -90,9 +94,18 @@ export async function generateWords(englishLevel: string, topicName: string): Pr
 /**
  * Create topic-specific prompt for OpenAI
  */
-function createPromptForTopic(topicName: string, englishLevel: string): string {
+function createPromptForTopic(
+  topicName: string, 
+  englishLevel: string, 
+  existingWords: string[]
+): string {
   
+  const existingWordsSection = existingWords.length > 0 
+    ? `\nDO NOT use any of these existing words: ${existingWords.join(', ')}\n` 
+    : '';
+
   const basePrompt = `Generate 7 unique words related to ${topicName}, appropriate for ${englishLevel} level English learners.
+    ${existingWordsSection}
     For each word, provide:
     1. An English word appropriate for ${englishLevel} level
     2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context
@@ -109,7 +122,8 @@ function createPromptForTopic(topicName: string, englishLevel: string): string {
     - Ensure the difficulty matches ${englishLevel} level English learners
     - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context
     - Use natural, conversational example sentences
-    - Use real, precise words (not phrases)`;
+    - Use real, precise words (not phrases)
+    - DO NOT use any words from the existing words list provided above`;
   
   // Add topic-specific guidance
   switch (topicName) {

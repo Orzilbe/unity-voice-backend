@@ -4,8 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const db_1 = __importDefault(require("../models/db"));
 const authMiddleware_1 = require("../middleware/authMiddleware");
+const db_1 = __importDefault(require("../models/db"));
 const router = express_1.default.Router();
 /**
  * קבלת סטטיסטיקות משתמשים
