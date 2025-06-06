@@ -15,7 +15,8 @@ var AgeRange;
     AgeRange["AGE_25_34"] = "25-34";
     AgeRange["AGE_35_44"] = "35-44";
     AgeRange["AGE_45_54"] = "45-54";
-    AgeRange["AGE_55_PLUS"] = "55+";
+    AgeRange["AGE_55_64"] = "55-64";
+    AgeRange["AGE_65_PLUS"] = "65+";
 })(AgeRange || (exports.AgeRange = AgeRange = {}));
 var UserRole;
 (function (UserRole) {

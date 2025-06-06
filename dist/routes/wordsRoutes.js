@@ -10,7 +10,7 @@ const authMiddleware_1 = require("../middleware/authMiddleware");
 const wordGenerator_1 = require("../services/wordGenerator");
 const router = express_1.default.Router();
 /**
- * קבלת מילים לפי נושא ורמת אנגלית
+ * קבלת מילים לפי נושא ורמת אנגלית - עם סינון מילים שנלמדו
  * GET /api/words?topic=topicName&level=level&randomLimit=5&filterLearned=true
  */
 router.get('/', authMiddleware_1.authMiddleware, async (req, res) => {
@@ -33,21 +33,38 @@ router.get('/', authMiddleware_1.authMiddleware, async (req, res) => {
             console.log(`👤 User's English Level from DB: "${userEnglishLevel}"`);
             // השתמש ב-level מה-query (השלב) לחיפוש במילים
             let userLevel = level || '1';
-            let query = 'SELECT * FROM words WHERE EnglishLevel = ?';
-            const params = [userEnglishLevel]; // 🔥 השתמש ב-EnglishLevel מהDB!
+            // 🔥 שאילתה מתוקנת לסינון מילים שנלמדו
+            let query = `
+        SELECT DISTINCT w.* 
+        FROM words w 
+        WHERE w.EnglishLevel = ?
+      `;
+            const params = [userEnglishLevel];
             // Add topic filter if provided
             if (topic) {
-                query += ' AND (TopicName = ? OR LOWER(TopicName) = LOWER(?))';
+                query += ' AND (w.TopicName = ? OR LOWER(w.TopicName) = LOWER(?))';
                 params.push(topic, topic);
             }
+            // 🔥 סינון מילים שכבר נלמדו על ידי המשתמש
+            query += ` 
+        AND w.WordId NOT IN (
+          SELECT DISTINCT wit.WordId
+          FROM wordintask wit
+          JOIN Tasks t ON wit.TaskId = t.TaskId
+          WHERE t.UserId = ?
+        )
+      `;
+            params.push(userId);
             // Add random ordering and limit
             const limit = randomLimit ? parseInt(randomLimit, 10) : 20;
             query += ' ORDER BY RAND() LIMIT ?';
             params.push(limit);
+            console.log('🔍 Executing query:', query);
+            console.log('📊 Query params:', params);
             const [words] = await connection.query(query, params);
-            console.log(`🔍 Found ${words.length} existing words for EnglishLevel: "${userEnglishLevel}"`);
+            console.log(`🔍 Found ${words.length} unlearned words for EnglishLevel: "${userEnglishLevel}"`);
             if (words.length < 5) {
-                console.log('🤖 Not enough words - starting AI generation');
+                console.log('🤖 Not enough unlearned words - starting AI generation');
                 console.log(`Topic: "${topic}", User's EnglishLevel: "${userEnglishLevel}"`);
                 try {
                     console.log('📞 Calling generateWords...');
@@ -57,8 +74,18 @@ router.get('/', authMiddleware_1.authMiddleware, async (req, res) => {
                     if (generatedWords.length > 0) {
                         console.log('💾 Saving to database...');
                         await saveNewWordsToDatabase(generatedWords, connection);
-                        const allWords = [...words, ...generatedWords];
-                        console.log(`📤 Returning ${allWords.length} total words`);
+                        // 🔥 סנן מילים חדשות שלא נלמדו עדיין
+                        const filteredNewWords = [];
+                        for (const newWord of generatedWords) {
+                            const [learned] = await connection.query(`SELECT 1 FROM wordintask wit
+                 JOIN Tasks t ON wit.TaskId = t.TaskId
+                 WHERE t.UserId = ? AND wit.WordId = ?`, [userId, newWord.WordId]);
+                            if (!Array.isArray(learned) || learned.length === 0) {
+                                filteredNewWords.push(newWord);
+                            }
+                        }
+                        const allWords = [...words, ...filteredNewWords];
+                        console.log(`📤 Returning ${allWords.length} total unlearned words`);
                         res.json(allWords);
                         return;
                     }
@@ -67,7 +94,7 @@ router.get('/', authMiddleware_1.authMiddleware, async (req, res) => {
                     console.error('❌ AI generation failed:', error);
                 }
             }
-            console.log(`📤 Returning ${words.length} existing words`);
+            console.log(`📤 Returning ${words.length} existing unlearned words`);
             res.json(words);
         }
         finally {
@@ -208,10 +235,6 @@ router.get('/in-task', authMiddleware_1.authMiddleware, async (req, res) => {
         });
     }
 });
-/**
- * 🆕 הוספת מילים למשימה - עם batch insert מתוקן
- * POST /api/words/to-task
- */
 /**
  * 📝 שמירת מילים למשימה (הפונקציה הקיימת - לתאימות אחורה)
  * POST /api/words/word-to-task

@@ -3,14 +3,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// apps/api/src/server.ts - תיקון עם סדר נכון של routes
+// unity-voice-backend/src/server.ts 
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const models_1 = require("./models");
 // Import routes
-const auth_1 = __importDefault(require("./routes/auth"));
+const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const topicsRoutes_1 = __importDefault(require("./routes/topicsRoutes"));
 const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const diagnosticRoutes_1 = __importDefault(require("./routes/diagnosticRoutes"));
@@ -24,6 +24,7 @@ const userProfileRoutes_1 = __importDefault(require("./routes/userProfileRoutes"
 const postRoutes_1 = __importDefault(require("./routes/postRoutes"));
 const commentRoutes_1 = __importDefault(require("./routes/commentRoutes"));
 const dashboardRoutes_1 = __importDefault(require("./routes/dashboardRoutes"));
+const quizRoutes_1 = __importDefault(require("./routes/quizRoutes"));
 // ✅ נסה לטעון את wordsToTaskRoutes - עם טיפול בשגיאות
 let wordsToTaskRoutes = null;
 try {
@@ -37,6 +38,7 @@ catch (error) {
 // Import middleware
 const errorHandler_1 = require("./middleware/errorHandler");
 const db_1 = require("./lib/db");
+const feedbackRoutes_1 = __importDefault(require("./routes/feedbackRoutes"));
 // Load environment variables
 dotenv_1.default.config();
 // Create Express app
@@ -129,7 +131,7 @@ app.get('/api/debug/routes', (req, res) => {
     });
 });
 // API Routes - ✅ סדר נכון וללא כפילויות
-app.use('/api/auth', auth_1.default);
+app.use('/api/auth', authRoutes_1.default);
 app.use('/api/topics', topicsRoutes_1.default);
 app.use('/api/user', userRoutes_1.default);
 app.use('/api/diagnostics', diagnosticRoutes_1.default);
@@ -138,6 +140,8 @@ app.use('/api/user-words', userWordsRoutes_1.default);
 app.use('/api/interactive-sessions', interactiveSessionRoutes_1.default);
 app.use('/api/flashcards', flashcardRoutes_1.default);
 app.use('/api/questions', questionRoutes_1.default);
+app.use('/api/feedback', feedbackRoutes_1.default);
+app.use('/api/quiz', quizRoutes_1.default);
 // ✅ Words routes - סדר חשוב! wordsToTaskRoutes לפני wordsRoutes
 if (wordsToTaskRoutes) {
     console.log('📝 Registering wordsToTaskRoutes at /api/words');
@@ -148,9 +152,9 @@ else {
 }
 app.use('/api/words', wordsRoutes_1.default); // ✅ רק פעם אחת!
 app.use('/api/user-profile', userProfileRoutes_1.default);
-app.use('/api/posts', postRoutes_1.default);
 app.use('/api/comments', commentRoutes_1.default);
 app.use('/api/dashboard', dashboardRoutes_1.default);
+app.use('/api/post-task', postRoutes_1.default);
 // 404 handler for unmatched routes
 app.use('*', (req, res) => {
     console.log(`❌ 404 - Route not found: ${req.method} ${req.originalUrl}`);
