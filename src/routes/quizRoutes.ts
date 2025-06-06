@@ -100,17 +100,40 @@ router.post('/complete', authMiddleware, async (req: IUserRequest, res: Response
       );
       const englishLevel = (userResult as any[])[0]?.EnglishLevel || 'intermediate';
 
-      // 4. Get learned words for this topic - אופציה חלופית יותר יעילה
-      const [learnedWordsResult] = await pool.execute(`
-        SELECT w.Word, w.Translation 
-        FROM userknownwords ukw
-        JOIN Words w ON ukw.WordId = w.WordId
-        WHERE ukw.UserId = ? AND w.TopicName = ?
-        ORDER BY ukw.AddedAt DESC
-        LIMIT 10
+      console.log('Getting learned words from flashcard task...');
+      const [flashcardTaskResult] = await pool.execute(`
+        SELECT TaskId, Level, CompletionDate
+        FROM Tasks 
+        WHERE UserId = ? 
+          AND TopicName = ? 
+          AND TaskType = 'flashcard' 
+          AND CompletionDate IS NOT NULL
+        ORDER BY CompletionDate DESC
+        LIMIT 1
       `, [userId, dbTopicName]);
       
-      const learnedWords = (learnedWordsResult as any[]).map(row => row.Word);
+      let learnedWords: string[] = [];
+      
+      if (Array.isArray(flashcardTaskResult) && flashcardTaskResult.length > 0) {
+        const flashcardTask = (flashcardTaskResult as any[])[0];
+        console.log(`Found flashcard task: ${flashcardTask.TaskId}`);
+        
+        // Get words from wordintask table for this task
+        const [wordsResult] = await pool.execute(`
+          SELECT w.Word, w.Translation, wit.AddedAt
+          FROM wordintask wit
+          JOIN Words w ON wit.WordId = w.WordId
+          WHERE wit.TaskId = ?
+          ORDER BY wit.AddedAt DESC
+          LIMIT 10
+        `, [flashcardTask.TaskId]);
+
+        
+        learnedWords = (wordsResult as any[]).map(row => row.Word);
+        console.log(`📚 Found ${learnedWords.length} learned words:`, learnedWords);
+      } else {
+        console.log('❌ No completed flashcard task found for this topic');
+      }
 
       // 5. Find suitable existing post that user hasn't seen
       console.log('Looking for suitable existing post...');
@@ -229,43 +252,30 @@ router.post('/complete', authMiddleware, async (req: IUserRequest, res: Response
 
 // Helper functions
 function convertTopicNameToDb(frontendTopicName: string): string {
-  // Convert from URL format (history-and-heritage) to DB format (History And Heritage)
+  // Convert from URL format to exact DB format as it appears in Levels table
   const conversions: { [key: string]: string } = {
-    'history-and-heritage': 'History And Heritage',
-    'diplomacy-and-peace': 'Diplomacy And Peace',
-    'economy-and-innovation': 'Economy And Innovation', 
-    'technology-and-innovation': 'Technology And Innovation',
-    'holocaust-remembrance': 'Holocaust Remembrance',
+    'history-and-heritage': 'History and Heritage',
+    'diplomacy-and-peace': 'Diplomacy and International Relations', 
+    'diplomacy-and-international-relations': 'Diplomacy and International Relations',
+    'economy-and-innovation': 'Economy and Entrepreneurship',
+    'economy-and-entrepreneurship': 'Economy and Entrepreneurship', 
+    'technology-and-innovation': 'Innovation and Technology',
+    'innovation-and-technology': 'Innovation and Technology',
+    'holocaust-remembrance': 'Holocaust and Revival',
+    'holocaust-and-revival': 'Holocaust and Revival',
     'iron-swords-war': 'Iron Swords War',
-    'society-and-culture': 'Society And Culture',
-    'environment-and-sustainability': 'Environment And Sustainability' // ← הוספתי את זה!
+    'society-and-culture': 'Society and Multiculturalism',
+    'society-and-multiculturalism': 'Society and Multiculturalism',
+    'environment-and-sustainability': 'Environment and Sustainability'
   };
   
   return conversions[frontendTopicName] || frontendTopicName;
 }
 
 function generateRequiredWords(topicName: string, learnedWords: string[]): string[] {
-  console.log(`🎯 Generating required words for topic: ${topicName}`);
-  console.log(`📖 Available learned words:`, learnedWords);
-  
-  // If user has learned words, prioritize them
-  if (learnedWords && learnedWords.length > 0) {
-    // Use 3-5 random words from learned words
-    const count = Math.min(Math.max(3, learnedWords.length), 5);
-    const shuffled = [...learnedWords].sort(() => 0.5 - Math.random());
-    const selectedWords = shuffled.slice(0, count);
-    
-    console.log(`✅ Selected ${selectedWords.length} learned words:`, selectedWords);
-    return selectedWords;
-  }
-  
-  // Fallback: if no learned words, use topic-specific words
-  console.log(`⚠️ No learned words found, falling back to topic-specific words`);
   const topicWords = getTopicSpecificWords(topicName);
-  const fallbackWords = topicWords.slice(0, 3);
-  
-  console.log(`📝 Using fallback words:`, fallbackWords);
-  return fallbackWords;
+  const combined = [...new Set([...learnedWords.slice(0, 3), ...topicWords])];
+  return combined.slice(0, 5);
 }
 
 function getTopicSpecificWords(topicName: string): string[] {

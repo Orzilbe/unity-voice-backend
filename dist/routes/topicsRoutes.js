@@ -5,8 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 // apps/api/src/routes/topicsRoutes.ts
 const express_1 = __importDefault(require("express"));
-const db_1 = __importDefault(require("../models/db"));
 const authMiddleware_1 = require("../middleware/authMiddleware");
+const db_1 = __importDefault(require("../models/db"));
 const router = express_1.default.Router();
 /**
  * קבלת כל הנושאים
@@ -17,20 +17,16 @@ router.get('/', authMiddleware_1.authMiddleware, async (req, res) => {
         console.log('Getting all topics');
         const connection = await db_1.default.getConnection();
         try {
-            const [topics] = await connection.execute('SELECT TopicName, TopicHe, Icon FROM Topics ORDER BY TopicName');
-            console.log(`Retrieved ${topics.length} topics`);
-            return res.json(topics);
+            const [rows] = await connection.query('SELECT * FROM Topics ORDER BY TopicName');
+            res.json(rows);
         }
         finally {
             connection.release();
         }
     }
     catch (error) {
-        console.error('Error fetching topics:', error);
-        return res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error occurred'
-        });
+        console.error('Error getting topics:', error);
+        res.status(500).json({ error: 'Failed to get topics' });
     }
 });
 exports.default = router;

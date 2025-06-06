@@ -8,7 +8,7 @@ const express_1 = __importDefault(require("express"));
 const openai_1 = require("openai");
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const router = express_1.default.Router();
-// OpenAI client setup (safely in backend)    
+// OpenAI client setup (safely in backend)     
 const openai = new openai_1.AzureOpenAI({
     apiKey: process.env.AZURE_OPENAI_API_KEY,
     endpoint: process.env.AZURE_OPENAI_ENDPOINT,

@@ -42,301 +42,372 @@ async function getUserEnglishLevel(userId: string): Promise<string> {
 /**
  * יוצר כרטיסיות פלאש חדשות באמצעות OpenAI לפי רמת האנגלית של המשתמש
  */
+// unity-voice-backend/src/routes/flashcardRoutes.ts
+// תיקון ליצירת מילים חדשות עם EnglishLevel נכון
+
+/**
+ * יוצר כרטיסיות פלאש חדשות באמצעות OpenAI לפי רמת האנגלית של המשתמש
+ */
 async function generateFlashcardsWithOpenAI(topicName: string, userId: string | number) {
   try {
-    // קבלת רמת האנגלית של המשתמש
     const userEnglishLevel = await getUserEnglishLevel(String(userId));
+    console.log(`🎯 Generating words for level: ${userEnglishLevel}`);
     
     let prompt = '';
     
     if(topicName === "Diplomacy and International Relations") {
-      prompt = `Generate 7 unique words related to diplomacy and international relations, appropriate for ${userEnglishLevel} level English learners.
-        highlighting:
-           - Diplomatic negotiations
-           - International conflict resolution
-           - Geopolitical strategies
-           - Cross-cultural communication
-           - Israeli diplomatic tasks
- 
-           For each word, provide:
-           1. An innovative diplomatic term
-           2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-           3. Detailed diplomatic context
-           4. An example sentence showing its application
- 
-           Respond as a JSON array with these fields:
-           [{
-             "word": "Diplomatic term",
-             "translation": "Hebrew translation",
-             "example": "Contextual usage sentence highlighting diplomatic nuance"
-           }, ...]
-             IMPORTANT: 
-             - Focus on diplomacy and international relations terms
-             -Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-             - Keep examples diplomatic-oriented
-             - Adjust difficulty to ${userEnglishLevel} level`;
-    } else if(topicName === "Economy and Entrepreneurship") {
-      prompt = `Generate 7 unique words related to economy and entrepreneurship, appropriate for ${userEnglishLevel} level English learners.
-      focusing on:
-          - Startup ecosystem
-          - Economic innovation
-          - Financial technologies
-          - Entrepreneurial strategies
-          - Global economic influence
-          For each word, provide:
-           1. An innovative economic term
-           2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-           3. Detailed innovative context
-           4. An example sentence showing its application
- 
-      Respond as a JSON array with these fields:
-      [{
-        "word": "English word",
-        "translation": "Hebrew translation",
-        "example": "A clear, natural example sentence in English using the word"
-      }, ...]
+      prompt = `Generate 7 unique ENGLISH words related to diplomacy and international relations, appropriate for ${userEnglishLevel} level English learners.
 
-      IMPORTANT: 
-      - Focus on economic and financial terms
-                   -Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-      - Keep examples business-oriented
-      - Adjust difficulty to ${userEnglishLevel} level`;
-    } 
-    else if(topicName === "Environment and Sustainability") {
-      prompt = `Generate 7 unique words related to environment and sustainability, appropriate for ${userEnglishLevel} level English learners.
-      focusing on:
-          - Environmental conservation
-          - Climate change
-          - Sustainable development
-          - Environmental policies
-          - Global environmental issues
-          For each word, provide:
-           1. An innovative environmental term
-           2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-           3. Detailed innovative context
-           4. An example sentence showing its application
- 
-      Respond as a JSON array with these fields:
-      [{
-        "word": "English word",
-        "translation": "Hebrew translation",
-        "example": "A clear, natural example sentence in English using the word"
-      }, ...]
+IMPORTANT: All words must be in ENGLISH only. Do not generate Hebrew words.
 
-      IMPORTANT: 
-      - Focus on environmental and sustainability terms
-                   -Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-      - Keep examples environmental-oriented
-      - Adjust difficulty to ${userEnglishLevel} level`;
-    }
-    else if(topicName === "Innovation and Technology") {
-      prompt = `Generate 7 unique words related to innovation and technology, appropriate for ${userEnglishLevel} level English learners.
-      focusing on:
-         - Startup ecosystem
-          - Technological breakthroughs
-          - AI and machine learning
-          - Cybersecurity innovations
-          - Green tech and sustainability
-          For each word, provide:
-          1. An innovative technological term
-           2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-           3. Detailed technological context
-           4. An example sentence showing its application
- 
-      Respond as a JSON array with these fields:
-      [{
-        "word": "English word",
-        "translation": "Hebrew translation",
-        "example": "A clear, natural example sentence in English using the word"
-      }, ...]
-           IMPORTANT: 
-      - Focus on innovation and technology terms
-      - Keep examples focusing on innovation and technology terms
-      - Adjust difficulty to ${userEnglishLevel} level`;
-    } else if(topicName === "History and Heritage") {
-      prompt = `Generate 7 unique words related to history and historical events, appropriate for ${userEnglishLevel} level English learners.
-      focusing on:
-          - Historical israeli and jewish milestones
-          - Cultural heritage
-          - Zionist movement
-          - Jewish diaspora experiences
-          - Historical resiliences
-          For each word, provide:
-           1. An innovative historical term
-           2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-           3. Detailed historical context
-           4. An example sentence showing its application
- 
-      Respond as a JSON array with these fields:
-      [{
-        "word": "English word",
-        "translation": "Hebrew translation",
-        "example": "A clear, natural example sentence in English using the word"
-      }, ...]
+Focus on:
+- Diplomatic negotiations
+- International conflict resolution  
+- Geopolitical strategies
+- Cross-cultural communication
+- Israeli diplomatic context
 
-           IMPORTANT: 
-      - Focus on historical and cultural terms
-                   -Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-      - pro israeli and jewish history
-      - Keep examples focusing on historical and cultural terms of Israel and Judaism - Pro-Israeli
-      - Adjust difficulty to ${userEnglishLevel} level`;
-    } else if(topicName === "Holocaust and Revival") {
-      prompt = `Generate 7 unique words related to Holocaust and Revival, appropriate for ${userEnglishLevel} level English learners.
-      focusing on:
-          - Holocaust remembrance
-          - Jewish resilience
-          - Post-traumatic recovery
-          - Cultural preservation
-          - Rebirth and hope
-          For each word, provide:
-           1. An innovative historical term
-           2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-           3. Detailed historical context
-           4. An example sentence showing its application
- 
-      Respond as a JSON array with these fields:
-      [{
-        "word": "English word",
-        "translation": "Hebrew translation",
-        "example": "A clear, natural example sentence in English using the word"
-      }, ...]
+For each ENGLISH word, provide:
+1. The English word (not Hebrew!)
+2. Hebrew translation of that English word
+3. Example sentence in English using the word
 
-           IMPORTANT: 
-      - Focus on historical and cultural terms
-     -Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-      - Keep examples focusing on historical and cultural terms of Israel and Judaism - Pro-Israeli
-      - Adjust difficulty to ${userEnglishLevel} level`;
-    } else if(topicName === "Iron Swords War") {
-      prompt = `Generate 7 unique words related to the Gaza war, appropriate for ${userEnglishLevel} level English learners.
-      focusing on:
-          - Israeli military operations
-          - Palestinian resistance
-          - International response
-          - Humanitarian concerns
-          - Geopolitical implications
-          For each word, provide:
-           1. An innovative diplomatic term
-           2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-           3. Detailed diplomatic context
-           4. An example sentence showing its application
- 
-      Respond as a JSON array with these fields:
-      [{
-        "word": "English word",
-        "translation": "Hebrew translation",
-        "example": "A clear, natural example sentence in English using the word"
-      }, ...]
-
-          IMPORTANT: 
-      - Focus on historical and cultural terms
-      - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-      - Keep examples focusing on historical and cultural terms of Israel and Judaism - Pro-Israeli
-      - Adjust difficulty to ${userEnglishLevel} level
-      For each word, provide:
-           1. An innovative diplomatic term
-           2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-           3. Detailed diplomatic context
-           4. An example sentence showing its application
- 
-      about gaza war:
-      - The Gaza war has been fought between Israel and Hamas-led Palestinian militant groups in the Gaza Strip and Israel since 7 October 2023.
-      -The first day was the deadliest in Israel's history
-      `;
-    } else if(topicName === "Society and Multiculturalism") {
-      prompt = `Generate 7 precise English words and phrases specifically related to social dynamics and multicultural interactions, appropriate for ${userEnglishLevel} level English learners.
-
-Focus Areas:
-- Social interaction terms
-- Multicultural communication concepts
-- Real-world social dynamics vocabulary
-- Terminology that captures nuanced social experiences
-
-Requirements for Each Term:
-1. A specific, meaningful English word or phrase
-2. Accurate Hebrew translation
-3. Contextual explanation 
-4. A natural, conversational example sentence
-
-Specific Guidance:
-- Select actual English words, not descriptive phrases
-- Ensure words reflect real social interactions
-- Prioritize terms that:
-  * Describe social relationships
-  * Capture cultural nuances
-  * Represent meaningful communication concepts
-
-IMPORTANT:
-- Words must be actual English terms
-- Translations must be precise
-- Provide real-world, usable vocabulary
-- Adjust complexity to ${userEnglishLevel} language level
-
-Output Format:
+Response format (JSON array):
 [{
-  "word": "Actual English word",
-  "translation": "Precise Hebrew translation",
-  "example": "Natural example sentence using the word in context"
-}, ...]`;
+  "word": "English word here",
+  "translation": "Hebrew translation here", 
+  "example": "English example sentence here"
+}, ...]
+
+Example of correct format:
+{
+  "word": "diplomacy",
+  "translation": "דיפלומטיה",
+  "example": "Modern diplomacy requires understanding cultural nuances."
+}
+
+Generate 7 words at ${userEnglishLevel} difficulty level.`;
+
+    } else if(topicName === "Economy and Entrepreneurship") {
+      prompt = `Generate 7 unique ENGLISH words related to economy and entrepreneurship, appropriate for ${userEnglishLevel} level English learners.
+
+IMPORTANT: All words must be in ENGLISH only. Do not generate Hebrew words.
+
+Focus on:
+- Startup ecosystem
+- Economic innovation
+- Financial technologies
+- Entrepreneurial strategies
+- Global economic influence
+
+For each ENGLISH word, provide:
+1. The English word (not Hebrew!)
+2. Hebrew translation of that English word
+3. Example sentence in English using the word
+
+Response format (JSON array):
+[{
+  "word": "English word here",
+  "translation": "Hebrew translation here",
+  "example": "English example sentence here"
+}, ...]
+
+Example of correct format:
+{
+  "word": "entrepreneur", 
+  "translation": "יזם",
+  "example": "The entrepreneur launched three successful startups."
+}
+
+Generate 7 words at ${userEnglishLevel} difficulty level.`;
+
+    } else if(topicName === "Environment and Sustainability") {
+      prompt = `Generate 7 unique ENGLISH words related to environment and sustainability, appropriate for ${userEnglishLevel} level English learners.
+
+IMPORTANT: All words must be in ENGLISH only. Do not generate Hebrew words.
+
+Focus on:
+- Environmental conservation
+- Climate change
+- Sustainable development
+- Environmental policies
+- Global environmental issues
+
+For each ENGLISH word, provide:
+1. The English word (not Hebrew!)
+2. Hebrew translation of that English word
+3. Example sentence in English using the word
+
+Response format (JSON array):
+[{
+  "word": "English word here",
+  "translation": "Hebrew translation here",
+  "example": "English example sentence here"
+}, ...]
+
+Example of correct format:
+{
+  "word": "sustainability",
+  "translation": "קיימות",
+  "example": "Sustainability is crucial for future generations."
+}
+
+Generate 7 words at ${userEnglishLevel} difficulty level.`;
+
+    } else if(topicName === "Innovation and Technology") {
+      prompt = `Generate 7 unique ENGLISH words related to innovation and technology, appropriate for ${userEnglishLevel} level English learners.
+
+IMPORTANT: All words must be in ENGLISH only. Do not generate Hebrew words.
+
+Focus on:
+- Technological breakthroughs
+- AI and machine learning
+- Cybersecurity innovations
+- Green tech and sustainability
+- Startup ecosystem
+
+For each ENGLISH word, provide:
+1. The English word (not Hebrew!)
+2. Hebrew translation of that English word
+3. Example sentence in English using the word
+
+Response format (JSON array):
+[{
+  "word": "English word here",
+  "translation": "Hebrew translation here",
+  "example": "English example sentence here"
+}, ...]
+
+Example of correct format:
+{
+  "word": "innovation",
+  "translation": "חדשנות",
+  "example": "Innovation drives technological progress."
+}
+
+Generate 7 words at ${userEnglishLevel} difficulty level.`;
+
+    } else if(topicName === "History and Heritage") {
+      prompt = `Generate 7 unique ENGLISH words related to history and heritage, appropriate for ${userEnglishLevel} level English learners.
+
+IMPORTANT: All words must be in ENGLISH only. Do not generate Hebrew words.
+
+Focus on:
+- Historical milestones
+- Cultural heritage
+- Historical movements
+- Historical resilience
+- Heritage preservation
+
+For each ENGLISH word, provide:
+1. The English word (not Hebrew!)
+2. Hebrew translation of that English word
+3. Example sentence in English using the word
+
+Response format (JSON array):
+[{
+  "word": "English word here",
+  "translation": "Hebrew translation here",
+  "example": "English example sentence here"
+}, ...]
+
+Example of correct format:
+{
+  "word": "heritage",
+  "translation": "מורשת",
+  "example": "Cultural heritage must be preserved for future generations."
+}
+
+Generate 7 words at ${userEnglishLevel} difficulty level.`;
+
+    } else if(topicName === "Holocaust and Revival") {
+      prompt = `Generate 7 unique ENGLISH words related to Holocaust remembrance and revival, appropriate for ${userEnglishLevel} level English learners.
+
+IMPORTANT: All words must be in ENGLISH only. Do not generate Hebrew words.
+
+Focus on:
+- Holocaust remembrance
+- Resilience and recovery
+- Historical documentation
+- Cultural preservation
+- Hope and renewal
+
+For each ENGLISH word, provide:
+1. The English word (not Hebrew!)
+2. Hebrew translation of that English word
+3. Example sentence in English using the word
+
+Response format (JSON array):
+[{
+  "word": "English word here",
+  "translation": "Hebrew translation here",
+  "example": "English example sentence here"
+}, ...]
+
+Example of correct format:
+{
+  "word": "resilience",
+  "translation": "חוסן",
+  "example": "The community showed remarkable resilience during difficult times."
+}
+
+Generate 7 words at ${userEnglishLevel} difficulty level.`;
+
+    } else if(topicName === "Iron Swords War") {
+      prompt = `Generate 7 unique ENGLISH words related to recent conflicts and international relations, appropriate for ${userEnglishLevel} level English learners.
+
+IMPORTANT: All words must be in ENGLISH only. Do not generate Hebrew words.
+
+Focus on:
+- Military operations
+- International response
+- Humanitarian concerns
+- Geopolitical implications
+- Conflict resolution
+
+For each ENGLISH word, provide:
+1. The English word (not Hebrew!)
+2. Hebrew translation of that English word
+3. Example sentence in English using the word
+
+Response format (JSON array):
+[{
+  "word": "English word here",
+  "translation": "Hebrew translation here",
+  "example": "English example sentence here"
+}, ...]
+
+Example of correct format:
+{
+  "word": "conflict",
+  "translation": "עימות",
+  "example": "International mediation can help resolve conflicts."
+}
+
+Generate 7 words at ${userEnglishLevel} difficulty level.`;
+
+    } else if(topicName === "Society and Multiculturalism") {
+      prompt = `Generate 7 unique ENGLISH words related to social dynamics and multicultural interactions, appropriate for ${userEnglishLevel} level English learners.
+
+IMPORTANT: All words must be in ENGLISH only. Do not generate Hebrew words.
+
+Focus on:
+- Social interaction
+- Multicultural communication
+- Community dynamics
+- Cultural diversity
+- Social integration
+
+For each ENGLISH word, provide:
+1. The English word (not Hebrew!)
+2. Hebrew translation of that English word
+3. Example sentence in English using the word
+
+Response format (JSON array):
+[{
+  "word": "English word here",
+  "translation": "Hebrew translation here",
+  "example": "English example sentence here"
+}, ...]
+
+Example of correct format:
+{
+  "word": "diversity",
+  "translation": "גיווון",
+  "example": "Cultural diversity enriches our society."
+}
+
+Generate 7 words at ${userEnglishLevel} difficulty level.`;
+
     } else {
-      // אם הנושא לא מוכר, יצירת פרומפט כללי
-      prompt = `Generate 7 unique words related to ${topicName}, appropriate for ${userEnglishLevel} level English learners.
-      For each word, provide:
-           1. An innovative diplomatic term
-           2. Hebrew translation - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-           3. Detailed diplomatic context
-           4. An example sentence showing its application
- 
-      Respond as a JSON array with these fields:
-      [{
-        "word": "English word",
-        "translation": "Hebrew translation",
-        "example": "A clear, natural example sentence in English using the word"
-      }, ...]
-      
-      IMPORTANT: 
-      - Make sure your translation into Hebrew is correct, accurate, and in the appropriate context.
-      - Adjust difficulty to ${userEnglishLevel} level`;
+      // פרומפט כללי לנושאים אחרים
+      prompt = `Generate 7 unique ENGLISH words related to ${topicName}, appropriate for ${userEnglishLevel} level English learners.
+
+IMPORTANT: All words must be in ENGLISH only. Do not generate Hebrew words.
+
+For each ENGLISH word, provide:
+1. The English word (not Hebrew!)
+2. Hebrew translation of that English word
+3. Example sentence in English using the word
+
+Response format (JSON array):
+[{
+  "word": "English word here",
+  "translation": "Hebrew translation here",
+  "example": "English example sentence here"
+}, ...]
+
+Example of correct format:
+{
+  "word": "example",
+  "translation": "דוגמה",
+  "example": "This is an example sentence in English."
+}
+
+Generate 7 words at ${userEnglishLevel} difficulty level related to ${topicName}.`;
     }
 
-    // שליחת בקשה ל-OpenAI
+    // שליחת בקשה ל-OpenAI עם הדגשה נוספת
     const completion = await openai.chat.completions.create({
       model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-4o",
       messages: [
-        { role: "system", content: "You are a precise language learning assistant creating vocabulary words." },
+        { 
+          role: "system", 
+          content: "You are an English vocabulary assistant. You MUST generate only ENGLISH words, never Hebrew words. Always respond with English words and their Hebrew translations, not the other way around." 
+        },
         { role: "user", content: prompt }
       ],
       temperature: 0.7,
-      max_tokens: 1000
+      max_tokens: 1200
     });
 
-    // עיבוד התשובה
+    // עיבוד התשובה עם בדיקת תקינות
     const responseText = completion.choices[0].message.content?.trim() || '';
+    console.log('🤖 AI Response preview:', responseText.substring(0, 200) + '...');
+    
     let wordsData;
 
     try {
       const jsonMatch = responseText.match(/\[[\s\S]*\]/);
       const jsonString = jsonMatch ? jsonMatch[0] : responseText;
+      
       try {
         wordsData = JSON.parse(jsonString);
+        
+        // 🔥 בדיקת תקינות: וודא שכל המילים באנגלית
+        const validWords = wordsData.filter((item: any) => {
+          const word = item.word || '';
+          // בדיקה שהמילה באנגלית (רק אותיות לטיניות)
+          const isEnglish = /^[a-zA-Z\s\-']+$/.test(word);
+          // בדיקה שהמילה לא מכילה אותיות עבריות
+          const hasHebrew = /[\u0590-\u05FF]/.test(word);
+          
+          if (!isEnglish || hasHebrew) {
+            console.log(`❌ Rejecting non-English word: "${word}"`);
+            return false;
+          }
+          return true;
+        });
+        
+        if (validWords.length < wordsData.length) {
+          console.log(`⚠️ Filtered out ${wordsData.length - validWords.length} non-English words`);
+        }
+        
+        wordsData = validWords;
+        
       } catch (jsonError) {
         console.error('Error parsing OpenAI response as JSON:', jsonError);
-        const wordEntries = responseText.split(/\d+\.\s+/).filter(entry => entry.trim().length > 0);
-        wordsData = wordEntries.map(entry => {
-          const parts = entry.split(':');
-          if (parts.length >= 2) {
-            const word = parts[0].trim();
-            const rest = parts.slice(1).join(':').trim();
-            const sentences = rest.split(/\.\s+/);
-            const translation = sentences[0].trim();
-            const example = sentences.length > 1 ? sentences.slice(1).join('. ').trim() : '';
-            return { word, translation, example };
-          }
-          return null;
-        }).filter(item => item !== null);
+        // Fallback parsing logic כמו קודם...
+        wordsData = [];
       }
     } catch (error) {
       console.error('Error processing OpenAI response:', error);
       console.log('Raw response:', responseText);
+      return [];
+    }
+
+    if (!Array.isArray(wordsData) || wordsData.length === 0) {
+      console.error('❌ No valid English words generated');
       return [];
     }
 
@@ -348,35 +419,44 @@ Output Format:
       const wordId = uuidv4();
       const { word, translation, example = "" } = item;
 
+      // בדיקה נוספת שהמילה באנגלית
+      if (!/^[a-zA-Z\s\-']+$/.test(word) || /[\u0590-\u05FF]/.test(word)) {
+        console.log(`⏭️ Skipping non-English word: "${word}"`);
+        continue;
+      }
+
       // בדיקה אם המילה כבר קיימת
       const [existingWords] = await pool.execute(
         'SELECT * FROM Words WHERE Word = ? AND TopicName = ?',
         [word, topicName]
       );
 
-      // אם המילה כבר קיימת, דלג עליה
       if (Array.isArray(existingWords) && existingWords.length > 0) {
+        const existingWord = existingWords[0] as any;
         savedWords.push({
-          WordId: (existingWords[0] as any).WordId,
+          WordId: existingWord.WordId,
           Word: word,
           Translation: translation,
           ExampleUsage: example,
-          TopicName: topicName
+          TopicName: topicName,
+          EnglishLevel: existingWord.EnglishLevel || userEnglishLevel
         });
         continue;
       }
 
-      // שמירת מילה חדשה
+      // שמירת מילה חדשה עם EnglishLevel
+      console.log(`💾 Saving ENGLISH word: "${word}" with level: ${userEnglishLevel}`);
       await pool.execute(
         `INSERT INTO Words 
-         (WordId, Word, Translation, ExampleUsage, TopicName, CreatedAt, UpdatedAt)
-         VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+         (WordId, Word, Translation, ExampleUsage, TopicName, EnglishLevel, CreatedAt, UpdatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
           wordId,
           word,
           translation,
           example,
-          topicName
+          topicName,
+          userEnglishLevel
         ]
       );
 
@@ -385,16 +465,177 @@ Output Format:
         Word: word,
         Translation: translation,
         ExampleUsage: example,
-        TopicName: topicName
+        TopicName: topicName,
+        EnglishLevel: userEnglishLevel
       });
     }
 
+    console.log(`✅ Generated and saved ${savedWords.length} ENGLISH words with EnglishLevel: ${userEnglishLevel}`);
     return savedWords;
+    
   } catch (error) {
     console.error('Error generating flashcards with OpenAI:', error);
     return [];
   }
 }
+
+// 🔥 נתיב מתוקן לקבלת כרטיסיות פלאש לפי נושא ורמה - עם סינון מילים שנלמדו
+router.get('/:topic/:level', authMiddleware, async (req: IUserRequest, res) => {
+  const requestId = Date.now().toString();
+  
+  try {
+    const { topic, level } = req.params;
+    const userId = req.user?.id;
+    
+    console.log(`🚀 [${requestId}] GET flashcards for:`, { topic, level, userId });
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'User not authenticated',
+        requestId 
+      });
+    }
+    
+    const pool = await getDbPool();
+    
+    // בדיקה שהנושא קיים
+    const [topics] = await pool.execute(
+      'SELECT * FROM Topics WHERE TopicName = ?',
+      [topic]
+    );
+    
+    if (!Array.isArray(topics) || topics.length === 0) {
+      console.log(`❌ [${requestId}] Topic "${topic}" not found`);
+      return res.status(404).json({ 
+        success: false, 
+        error: `Topic "${topic}" not found`,
+        requestId 
+      });
+    }
+    
+    // קבלת רמת האנגלית של המשתמש
+    const userEnglishLevel = await getUserEnglishLevel(String(userId));
+    console.log(`📊 [${requestId}] User English level: "${userEnglishLevel}"`);
+    
+    // 🔥 שאילתה מתוקנת לקבלת מילים שלא נלמדו עדיין
+    let query = `
+      SELECT DISTINCT w.WordId, w.Word, w.Translation, w.ExampleUsage, w.TopicName, w.EnglishLevel
+      FROM Words w
+      WHERE w.TopicName = ? 
+      AND w.EnglishLevel = ?
+      AND w.WordId NOT IN (
+        SELECT DISTINCT wit.WordId
+        FROM wordintask wit
+        JOIN Tasks t ON wit.TaskId = t.TaskId
+        WHERE t.UserId = ?
+      )
+      ORDER BY RAND()
+      LIMIT 20
+    `;
+    
+    console.log(`🔍 [${requestId}] Executing query for unlearned words...`);
+    console.log(`📋 [${requestId}] Query parameters:`, { topic, userEnglishLevel, userId });
+    
+    const [words] = await pool.execute(query, [topic, userEnglishLevel, String(userId)]);
+    
+    console.log(`📝 [${requestId}] Found ${Array.isArray(words) ? words.length : 0} unlearned words`);
+    
+    // 🔥 תמיד צור מילים חדשות אם יש פחות מ-10 מילים
+    if (Array.isArray(words) && words.length < 10) {
+      console.log(`🤖 [${requestId}] Need more words (${words.length}/10), generating with AI...`);
+      
+      try {
+        const newWords = await generateFlashcardsWithOpenAI(topic, userId);
+        console.log(`✅ [${requestId}] Generated ${newWords.length} new words with AI`);
+        
+        // סנן מילים חדשות שלא נלמדו עדיין
+        const filteredNewWords = [];
+        for (const newWord of newWords) {
+          const [learned] = await pool.execute(
+            `SELECT 1 FROM wordintask wit
+             JOIN Tasks t ON wit.TaskId = t.TaskId
+             WHERE t.UserId = ? AND wit.WordId = ?`,
+            [String(userId), newWord.WordId]
+          );
+          
+          if (!Array.isArray(learned) || learned.length === 0) {
+            filteredNewWords.push(newWord);
+          } else {
+            console.log(`⏭️ [${requestId}] Skipping already learned word: ${newWord.Word}`);
+          }
+        }
+        
+        console.log(`🔍 [${requestId}] Filtered to ${filteredNewWords.length} truly new words`);
+        
+        const allWords = [...words, ...filteredNewWords];
+        console.log(`📤 [${requestId}] Returning ${allWords.length} total unlearned words`);
+        
+        return res.json({ 
+          success: true, 
+          data: allWords,
+          requestId,
+          debug: {
+            existingWords: words.length,
+            newWordsGenerated: newWords.length,
+            newWordsFiltered: filteredNewWords.length,
+            totalReturned: allWords.length,
+            userLevel: userEnglishLevel,
+            topic: topic,
+            minWordsThreshold: 10
+          }
+        });
+      } catch (aiError) {
+        console.error(`❌ [${requestId}] AI generation failed:`, aiError);
+        
+        // אם יצירת מילים חדשות נכשלה, החזר את המילים הקיימות
+        console.log(`📤 [${requestId}] Returning ${(words as any[]).length} existing words (AI failed)`);
+        return res.json({ 
+          success: true, 
+          data: words,
+          requestId,
+          warning: 'Could not generate additional words',
+          debug: {
+            existingWords: (words as any[]).length,
+            aiGenerationFailed: true,
+            userLevel: userEnglishLevel,
+            topic: topic
+          }
+        });
+      }
+    }
+    
+    console.log(`📤 [${requestId}] Returning ${(words as any[]).length} existing unlearned words (enough words found)`);
+    return res.json({ 
+      success: true, 
+      data: words,
+      requestId,
+      debug: {
+        existingWords: (words as any[]).length,
+        aiGenerationSkipped: 'Enough words found',
+        userLevel: userEnglishLevel,
+        topic: topic
+      }
+    });
+    
+  } catch (error) {
+    console.error(`💥 [${requestId}] Error fetching flashcards:`, {
+      error: error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      params: req.params,
+      userId: req.user?.id
+    });
+    
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch flashcards',
+      requestId,
+      details: process.env.NODE_ENV === 'development' ? 
+        (error instanceof Error ? error.message : 'Unknown error') : undefined
+    });
+  }
+});
 
 // נתיב ליצירת כרטיסיית פלאש חדשה
 router.post('/', authMiddleware, async (req: IUserRequest, res) => {
@@ -460,11 +701,13 @@ router.post('/', authMiddleware, async (req: IUserRequest, res) => {
   }
 });
 
-// נתיב לקבלת כרטיסיות פלאש לפי נושא ורמה
+// 🔥 נתיב מתוקן לקבלת כרטיסיות פלאש לפי נושא ורמה - עם סינון מילים שנלמדו
 router.get('/:topic/:level', authMiddleware, async (req: IUserRequest, res) => {
   try {
     const { topic, level } = req.params;
     const userId = req.user?.id;
+    
+    console.log('🚀 GET flashcards for:', { topic, level, userId });
     
     if (!userId) {
       return res.status(401).json({ 
@@ -488,38 +731,55 @@ router.get('/:topic/:level', authMiddleware, async (req: IUserRequest, res) => {
       });
     }
     
-    // שאילתה לקבלת מילים בנושא וברמה המבוקשים, ללא מילים שכבר נלמדו
+    // קבלת רמת האנגלית של המשתמש
+    const userEnglishLevel = await getUserEnglishLevel(String(userId));
+    console.log('📊 User English level:', userEnglishLevel);
+    
+    // 🔥 שאילתה מתוקנת לקבלת מילים שלא נלמדו עדיין
     let query = `
-      SELECT w.WordId, w.Word, w.Translation, w.ExampleUsage, w.TopicName 
+      SELECT DISTINCT w.WordId, w.Word, w.Translation, w.ExampleUsage, w.TopicName 
       FROM Words w
-      JOIN Topics t ON w.TopicName = t.TopicName
-      JOIN Levels l ON t.TopicName = l.TopicName
-      WHERE t.TopicName = ? AND l.Level = ?
+      WHERE w.TopicName = ? 
+      AND w.EnglishLevel = ?
+      AND w.WordId NOT IN (
+        SELECT DISTINCT wit.WordId
+        FROM wordintask wit
+        JOIN Tasks t ON wit.TaskId = t.TaskId
+        WHERE t.UserId = ?
+      )
+      ORDER BY RAND()
+      LIMIT 20
     `;
     
-    // אם המשתמש מחובר, סנן מילים שכבר למד
-    if (userId) {
-      query += `
-        AND w.WordId NOT IN (
-          SELECT wi.WordId
-          FROM wordintask wi
-          JOIN Tasks ta ON wi.TaskId = ta.TaskId
-          WHERE ta.UserId = ?
-        )
-      `;
-    }
+    const [words] = await pool.execute(query, [topic, userEnglishLevel, String(userId)]);
     
-    const queryParams = [topic, level];
-    if (userId) queryParams.push(String(userId));
+    console.log('📝 Found existing words:', Array.isArray(words) ? words.length : 0);
     
-    const [words] = await pool.execute(query, queryParams);
-    
-    // אם אין מספיק מילים, צור מילים חדשות עם OpenAI
-    if (Array.isArray(words) && words.length < 5 && userId) {
+    // אם אין מספיק מילים (פחות מ-5), צור מילים חדשות עם OpenAI
+    if (Array.isArray(words) && words.length < 5) {
+      console.log('🤖 Generating new words with AI...');
       const newWords = await generateFlashcardsWithOpenAI(topic, userId);
+      
+      // סנן מילים חדשות שלא נלמדו עדיין
+      const filteredNewWords = [];
+      for (const newWord of newWords) {
+        const [learned] = await pool.execute(
+          `SELECT 1 FROM wordintask wit
+           JOIN Tasks t ON wit.TaskId = t.TaskId
+           WHERE t.UserId = ? AND wit.WordId = ?`,
+          [String(userId), newWord.WordId]
+        );
+        
+        if (!Array.isArray(learned) || learned.length === 0) {
+          filteredNewWords.push(newWord);
+        }
+      }
+      
+      console.log('✅ Filtered new words:', filteredNewWords.length);
+      
       return res.json({ 
         success: true, 
-        data: [...words, ...newWords] 
+        data: [...words, ...filteredNewWords] 
       });
     }
     

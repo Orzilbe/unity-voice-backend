@@ -1,10 +1,10 @@
 // unity-voice-backend/src/routes/feedback.ts
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { AzureOpenAI } from 'openai';
 import { authenticateToken } from '../middleware/authMiddleware';
 const router = express.Router();
 
-// OpenAI client setup (safely in backend)    
+// OpenAI client setup (safely in backend)     
 const openai = new AzureOpenAI({
   apiKey: process.env.AZURE_OPENAI_API_KEY!,
   endpoint: process.env.AZURE_OPENAI_ENDPOINT!,
@@ -37,7 +37,7 @@ interface FeedbackScores {
 /**
  * Generate AI feedback for user comment - POST /api/feedback/comment
  */
-router.post('/comment', authenticateToken, async (req, res) => {
+router.post('/comment', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { commentContent, postContent, requiredWords, topicName, level }: CommentFeedbackRequest = req.body;
     

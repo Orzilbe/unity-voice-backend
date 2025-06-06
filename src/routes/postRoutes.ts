@@ -224,7 +224,6 @@ async function generatePostWithAI(topicName: string, englishLevel: string, requi
 }
 
 function createTopicPrompt(topicName: string, englishLevel: string, requiredWords: string[]): string {
-  // Use the DB topic name directly (it's already properly formatted)
   const formattedTopic = topicName;
   
   let difficultyAdjustment = '';
@@ -243,65 +242,232 @@ function createTopicPrompt(topicName: string, englishLevel: string, requiredWord
       difficultyAdjustment = 'Balance simple and complex sentences. Use up to 120 words.';
   }
   
+  // 🔥 Base prompt עם הדגשה על השימוש במילים הנדרשות
   let prompt = `Create a social media style post about a specific significant event, achievement, or milestone related to ${formattedTopic} in Israel.
-               The post should:
-               - Be written in a social media-friendly tone (like Facebook)
-               - Focus on ONE specific event, achievement, or milestone
-               - Include specific dates, names, and factual details
-               - Include no more than 3 relevant emojis
-               - ${difficultyAdjustment}
-               - Naturally incorporate these words: ${requiredWords.join(', ')}
-               - End with 1-2 engaging questions to spark conversation
-               - Be factually accurate and educational
-               - Avoid controversial political statements
-               - Keep it pro-Israeli and informative`;
+
+CRITICAL REQUIREMENTS:
+- The post MUST stay strictly within the topic of "${formattedTopic}"
+- You MUST use ALL of these required words naturally in the text: ${requiredWords.join(', ')}
+- Do NOT use these words as hashtags - integrate them into the actual sentences
+- Be written in a social media-friendly tone (like Facebook)
+- Focus on ONE specific event, achievement, or milestone
+- Include specific dates, names, and factual details
+- Include no more than 3 relevant emojis
+- ${difficultyAdjustment}
+- End with 1-2 engaging questions to spark conversation
+- Be factually accurate and educational
+- Avoid controversial political statements
+- Keep it pro-Israeli and informative
+
+REQUIRED WORDS TO USE: ${requiredWords.join(', ')}`;
   
-  // Use the exact topic name from DB for better matching
+  // 🔥 Topic-specific guidance מתוקן להיות יותר ממוקד
   const lowerTopic = topicName.toLowerCase();
   
   if (lowerTopic.includes('diplomacy') || lowerTopic.includes('international')) {
-    prompt += `\n\nFocus on Israeli diplomatic achievements, peace agreements, or international relations.`;
+    prompt += `\n\nTOPIC FOCUS: Israeli diplomatic achievements, peace agreements, international relations, ambassadors, treaties, or diplomatic milestones. 
+    EXAMPLES: Camp David Accords, Abraham Accords, UN speeches, diplomatic recognition, peace treaties.
+    AVOID: Environmental projects, technology startups, military operations.`;
+    
   } else if (lowerTopic.includes('economy') || lowerTopic.includes('entrepreneurship')) {
-    prompt += `\n\nFocus on Israel's startup ecosystem, economic innovations, or entrepreneurial success stories.`;
+    prompt += `\n\nTOPIC FOCUS: Israel's startup ecosystem, economic innovations, entrepreneurial success stories, business achievements, IPOs, or economic milestones.
+    EXAMPLES: Startup exits, unicorn companies, business innovations, economic policies, trade agreements.
+    AVOID: Environmental projects, military technology, diplomatic events.`;
+    
   } else if (lowerTopic.includes('environment') || lowerTopic.includes('sustainability')) {
-    prompt += `\n\nFocus on Israeli environmental initiatives, green technology, renewable energy, or sustainability efforts.`;
-  } else if (lowerTopic.includes('history') || lowerTopic.includes('heritage')) {
-    prompt += `\n\nFocus on significant historical events, cultural heritage, or archaeological discoveries in Israel.`;
-  } else if (lowerTopic.includes('holocaust') || lowerTopic.includes('revival')) {
-    prompt += `\n\nFocus on Holocaust remembrance, survival stories, or the journey toward establishing Israel.`;
+    prompt += `\n\nTOPIC FOCUS: Israeli environmental initiatives, green technology, renewable energy, sustainability efforts, climate action, or ecological achievements.
+    EXAMPLES: Solar farms, water desalination, green building, environmental policies, conservation efforts.
+    AVOID: General technology, diplomatic events, military innovations.`;
+    
   } else if (lowerTopic.includes('innovation') || lowerTopic.includes('technology')) {
-    prompt += `\n\nFocus on Israeli technological breakthroughs, scientific achievements, or innovative solutions.`;
+    prompt += `\n\nTOPIC FOCUS: Israeli technological breakthroughs, scientific achievements, innovative solutions, tech companies, research discoveries, or technological milestones.
+    EXAMPLES: Medical devices, AI breakthroughs, cybersecurity innovations, scientific research, tech IPOs, patent inventions.
+    AVOID: Environmental sustainability projects, diplomatic achievements, general business news.`;
+    
+  } else if (lowerTopic.includes('history') || lowerTopic.includes('heritage')) {
+    prompt += `\n\nTOPIC FOCUS: Significant historical events, cultural heritage, archaeological discoveries, historical figures, or heritage preservation in Israel.
+    EXAMPLES: Archaeological finds, historical site discoveries, museum openings, cultural preservation, historical anniversaries.
+    AVOID: Modern technology, current diplomatic events, environmental projects.`;
+    
+  } else if (lowerTopic.includes('holocaust') || lowerTopic.includes('revival')) {
+    prompt += `\n\nTOPIC FOCUS: Holocaust remembrance, survival stories, memorial events, educational initiatives, or the journey toward establishing Israel.
+    EXAMPLES: Yad Vashem events, survivor testimonies, memorial ceremonies, educational programs, remembrance initiatives.
+    AVOID: Modern technology, environmental projects, current diplomatic events.`;
+    
   } else if (lowerTopic.includes('iron') || lowerTopic.includes('sword')) {
-    prompt += `\n\nFocus on Israel's security challenges, defense innovations, or resilience in times of conflict.`;
+    prompt += `\n\nTOPIC FOCUS: Israel's security challenges, defense innovations, resilience in times of conflict, military technology, or security achievements.
+    EXAMPLES: Defense systems, security innovations, resilience stories, defense cooperation, security milestones.
+    AVOID: Environmental projects, general technology, diplomatic negotiations.`;
+    
   } else if (lowerTopic.includes('society') || lowerTopic.includes('multiculturalism')) {
-    prompt += `\n\nFocus on Israel's diverse society, multiculturalism, or unique social phenomena.`;
+    prompt += `\n\nTOPIC FOCUS: Israel's diverse society, multiculturalism, social integration, community initiatives, or unique social phenomena.
+    EXAMPLES: Cultural festivals, integration programs, community projects, social initiatives, multicultural events.
+    AVOID: Technology breakthroughs, environmental projects, military topics.`;
   }
   
-  console.log(`🎯 Creating prompt for topic: "${topicName}" with focus area detected`);
+  // 🔥 הדגשה נוספת
+  prompt += `\n\nREMINDER: 
+1. Stay strictly within the "${formattedTopic}" topic
+2. Use ALL required words: ${requiredWords.join(', ')}
+3. Focus on Israeli context only
+4. Include specific factual details`;
+  
+  console.log(`🎯 Creating focused prompt for topic: "${topicName}"`);
+  console.log(`📝 Required words to include: ${requiredWords.join(', ')}`);
+  
   return prompt;
+}
+
+// 🔥 פונקציה נוספת לוודא שהתוכן רלוונטי לנושא
+function validatePostContent(postContent: string, topicName: string, requiredWords: string[]): {
+  isValid: boolean;
+  issues: string[];
+  suggestions: string[];
+} {
+  const issues: string[] = [];
+  const suggestions: string[] = [];
+  const lowerContent = postContent.toLowerCase();
+  const lowerTopic = topicName.toLowerCase();
+  
+  // בדיקה שכל המילים הנדרשות מופיעות
+  const missingWords = requiredWords.filter(word => 
+    !lowerContent.includes(word.toLowerCase())
+  );
+  
+  if (missingWords.length > 0) {
+    issues.push(`Missing required words: ${missingWords.join(', ')}`);
+    suggestions.push('Regenerate the post to include all required vocabulary words');
+  }
+  
+  // בדיקות ספציפיות לנושא
+  if (lowerTopic.includes('innovation') || lowerTopic.includes('technology')) {
+    const hasEnvironmentWords = ['wind', 'solar', 'environmental', 'sustainability', 'green', 'eco'].some(word => 
+      lowerContent.includes(word)
+    );
+    if (hasEnvironmentWords) {
+      issues.push('Post contains environmental content instead of technology/innovation focus');
+      suggestions.push('Focus on technological breakthroughs, AI, cybersecurity, or tech companies instead');
+    }
+    
+    const hasTechWords = ['technology', 'innovation', 'startup', 'ai', 'cyber', 'research', 'development'].some(word => 
+      lowerContent.includes(word)
+    );
+    if (!hasTechWords) {
+      issues.push('Post lacks technology/innovation terminology');
+      suggestions.push('Include words like: technology, innovation, startup, research, development');
+    }
+  }
+  
+  if (lowerTopic.includes('environment') || lowerTopic.includes('sustainability')) {
+    const hasTechWords = ['startup', 'innovation', 'ai', 'cyber'].some(word => 
+      lowerContent.includes(word) && !lowerContent.includes('green ' + word)
+    );
+    if (hasTechWords) {
+      issues.push('Post contains technology content instead of environmental focus');
+      suggestions.push('Focus on environmental initiatives, sustainability, renewable energy instead');
+    }
+  }
+  
+  if (lowerTopic.includes('diplomacy')) {
+    const hasNonDiplomaticWords = ['startup', 'technology', 'environment'].some(word => 
+      lowerContent.includes(word)
+    );
+    if (hasNonDiplomaticWords) {
+      issues.push('Post contains non-diplomatic content');
+      suggestions.push('Focus on diplomatic achievements, peace agreements, international relations');
+    }
+  }
+  
+  return {
+    isValid: issues.length === 0,
+    issues,
+    suggestions
+  };
+}
+
+// 🔥 עדכון הפונקציה generatePostWithAI לכלול validation
+async function generatePostWithAIImproved(topicName: string, englishLevel: string, requiredWords: string[]): Promise<{text: string}> {
+  let attempts = 0;
+  const maxAttempts = 3;
+  
+  while (attempts < maxAttempts) {
+    try {
+      attempts++;
+      console.log(`🔄 Attempt ${attempts}/${maxAttempts} to generate focused post`);
+      
+      const prompt = createTopicPrompt(topicName, englishLevel, requiredWords);
+      
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: `You are an educational assistant specializing in creating focused social media content about Israel. 
+                     You MUST stay strictly within the specified topic and use ALL required vocabulary words.
+                     Topic: ${topicName}
+                     Required words: ${requiredWords.join(', ')}`
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 500,
+        temperature: 0.7,
+      });
+
+      const generatedText = completion.choices[0]?.message?.content?.trim() || '';
+      
+      if (!generatedText) {
+        throw new Error('No content generated from AI');
+      }
+      
+      // Validate the generated content
+      const validation = validatePostContent(generatedText, topicName, requiredWords);
+      
+      if (validation.isValid) {
+        console.log(`✅ Successfully generated valid post on attempt ${attempts}`);
+        return { text: generatedText };
+      } else {
+        console.log(`❌ Attempt ${attempts} failed validation:`, validation.issues);
+        if (attempts === maxAttempts) {
+          console.log('⚠️ Max attempts reached, using last generated content with warning');
+          return { 
+            text: generatedText + '\n\n[Note: This content may not perfectly match the topic requirements]' 
+          };
+        }
+      }
+      
+    } catch (error) {
+      console.error(`💥 Attempt ${attempts} failed:`, error);
+      if (attempts === maxAttempts) {
+        throw error;
+      }
+    }
+  }
+  
+  throw new Error('Failed to generate valid content after all attempts');
 }
 
 function generateRequiredWords(topicName: string, learnedWords: string[]): string[] {
   console.log(`🎯 Generating required words for topic: ${topicName}`);
-  console.log(`📖 Available learned words:`, learnedWords);
+  console.log(`📖 Available learned words from flashcard:`, learnedWords);
   
-  // If user has learned words, use them as required words
   if (learnedWords && learnedWords.length > 0) {
-    // Use 3-5 random words from learned words
-    const count = Math.min(Math.max(3, learnedWords.length), 5);
-    const shuffled = [...learnedWords].sort(() => 0.5 - Math.random());
-    const selectedWords = shuffled.slice(0, count);
+    // User has completed flashcard task - use their learned words
+    const count = Math.min(learnedWords.length, 5);
+    const selectedWords = learnedWords.slice(0, count);
     
-    console.log(`✅ Selected ${selectedWords.length} learned words:`, selectedWords);
+    console.log(`✅ Using ${selectedWords.length} words from flashcard task:`, selectedWords);
     return selectedWords;
   }
   
-  // Fallback: if no learned words, use topic-specific words
-  console.log(`⚠️ No learned words found, falling back to topic-specific words`);
+  // Fallback: User hasn't completed flashcard task yet - use topic-specific words
+  console.log(`⚠️ No flashcard task completed, using topic-specific words`);
   const topicWords = getTopicSpecificWords(topicName);
-  const fallbackWords = topicWords.slice(0, 3);
+  const fallbackWords = topicWords.slice(0, 5);
   
-  console.log(`📝 Using fallback words:`, fallbackWords);
+  console.log(`📝 Using topic-specific words:`, fallbackWords);
   return fallbackWords;
 }
 
@@ -359,24 +525,48 @@ async function getUserLearnedWords(userId: string, topicName: string): Promise<s
   try {
     const pool = DatabaseConnection.getPool();
     
-    // Get words that the user has learned in this specific topic
-    const [result] = await pool.execute(`
-      SELECT DISTINCT w.Word 
-      FROM userknownwords ukw
-      JOIN Words w ON ukw.WordId = w.WordId
-      WHERE ukw.UserId = ? AND w.TopicName = ?
-      ORDER BY ukw.AddedAt DESC
-      LIMIT 10
+    console.log(`🔍 [DEBUG] Getting learned words from flashcard tasks:`);
+    console.log(`   UserId: "${userId}"`);
+    console.log(`   TopicName: "${topicName}"`);
+    
+    // Step 1: Find the user's completed flashcard task for this topic
+    const [flashcardTaskResult] = await pool.execute(`
+      SELECT TaskId, Level, CompletionDate
+      FROM Tasks 
+      WHERE UserId = ? 
+        AND TopicName = ? 
+        AND TaskType = 'flashcard' 
+        AND CompletionDate IS NOT NULL
+      ORDER BY CompletionDate DESC
+      LIMIT 1
     `, [userId, topicName]);
     
-    const learnedWords = (result as any[]).map(row => row.Word);
-    console.log(`📚 Found ${learnedWords.length} learned words for user ${userId} in topic ${topicName}:`, learnedWords);
+    if (!Array.isArray(flashcardTaskResult) || flashcardTaskResult.length === 0) {
+      console.log(`❌ [DEBUG] No completed flashcard task found for user ${userId} in topic ${topicName}`);
+      return [];
+    }
+    
+    const flashcardTask = (flashcardTaskResult as any[])[0];
+    console.log(`✅ [DEBUG] Found flashcard task: ${flashcardTask.TaskId}, Level: ${flashcardTask.Level}`);
+    
+    // Step 2: Get words from wordintask table for this task - FIXED QUERY
+    const [wordsResult] = await pool.execute(`
+      SELECT w.Word, w.Translation, w.EnglishLevel, wit.AddedAt
+      FROM wordintask wit
+      JOIN Words w ON wit.WordId = w.WordId
+      WHERE wit.TaskId = ?
+      ORDER BY wit.AddedAt DESC
+      LIMIT 10
+    `, [flashcardTask.TaskId]);
+    
+    const learnedWords = (wordsResult as any[]).map(row => row.Word);
+    console.log(`📚 [DEBUG] Found ${learnedWords.length} words from flashcard task:`, learnedWords);
     
     return learnedWords;
+    
   } catch (error) {
-    console.error('Error fetching learned words:', error);
+    console.error('❌ [ERROR] Error fetching learned words from flashcard task:', error);
     return [];
   }
 }
-
 export default router;
