@@ -1,4 +1,4 @@
-// unity-voice-backend/src/routes/auth.ts
+// unity-voice-backend/src/routes/authRoutes.ts (הקובץ הנכון!)
 import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
@@ -19,8 +19,24 @@ const cookieOptions = {
   sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const, // ✅ חשוב לcross-domain
   maxAge: 24 * 60 * 60 * 1000, // 24 שעות במילישניות
   path: '/', // זמין לכל המסלולים
-  domain: process.env.NODE_ENV === 'production' ? undefined : undefined // ✅ לא מגדירים domain בפרודקשן
 };
+
+// ✅ נתיב debug לבדיקת cookies - ראשון ברשימה
+router.get('/debug/cookies', (req, res) => {
+  console.log('🔍 Debug cookies requested');
+  res.json({
+    message: 'Cookie debug information',
+    cookies: req.cookies || {},
+    headers: {
+      cookie: req.headers.cookie || 'No cookie header',
+      origin: req.headers.origin || 'No origin header',
+      'user-agent': req.headers['user-agent'] || 'No user agent'
+    },
+    environment: process.env.NODE_ENV,
+    cookieOptions: cookieOptions,
+    timestamp: new Date().toISOString()
+  });
+});
 
 router.post('/validate', authMiddleware, (req: IUserRequest, res) => {
   res.json({ 
@@ -76,9 +92,11 @@ router.post('/login', async (req, res) => {
       [user.UserId]
     );
 
-    // ✅ הגדרת cookie עם הגדרות מתוקנות
-    console.log('🍪 Setting cookie with options:', {
-      ...cookieOptions,
+    // ✅ הגדרת cookie עם הגדרות מתוקנות + לוגים
+    console.log('🍪 Setting auth cookie for login:', {
+      email: user.Email,
+      environment: process.env.NODE_ENV,
+      cookieOptions,
       tokenLength: token.length
     });
     
@@ -92,7 +110,8 @@ router.post('/login', async (req, res) => {
         userId: user.UserId,
         email: user.Email
       },
-      cookieSet: true // ✅ אינדיקטור שהcookie נקבע
+      cookieSet: true,
+      cookieOptions: cookieOptions // ✅ לdebug
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -180,7 +199,13 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
       { expiresIn: '7d' }
     );
 
-    // ✅ הגדרת cookie במקום החזרת טוקן בגוף התגובה
+    // ✅ הגדרת cookie עם לוגים
+    console.log('🍪 Setting auth cookie for registration:', {
+      email,
+      userId,
+      environment: process.env.NODE_ENV
+    });
+
     res.cookie('authToken', token, {
       ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ימים לרישום
@@ -221,19 +246,6 @@ router.post('/logout', (req, res) => {
   res.json({ 
     success: true,
     message: 'Logged out successfully' 
-  });
-});
-
-// ✅ נתיב debug לבדיקת cookies
-router.get('/debug/cookies', (req, res) => {
-  res.json({
-    cookies: req.cookies || {},
-    headers: {
-      cookie: req.headers.cookie || 'No cookie header',
-      origin: req.headers.origin || 'No origin header'
-    },
-    environment: process.env.NODE_ENV,
-    cookieOptions: cookieOptions
   });
 });
 
