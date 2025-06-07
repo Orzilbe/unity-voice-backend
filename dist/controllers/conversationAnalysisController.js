@@ -17,9 +17,9 @@ function initializeOpenAI() {
     console.log('- API Key length:', process.env.AZURE_OPENAI_API_KEY?.length || 0);
     console.log('- Endpoint:', process.env.AZURE_OPENAI_ENDPOINT);
     console.log('- Deployment:', process.env.AZURE_OPENAI_DEPLOYMENT_NAME);
-    console.log('- Version:', process.env.OPENAI_API_VERSION);
+    console.log('- Version:', process.env.AZURE_OPENAI_API_VERSION);
     if (!process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_ENDPOINT ||
-        !process.env.AZURE_OPENAI_DEPLOYMENT_NAME || !process.env.OPENAI_API_VERSION) {
+        !process.env.AZURE_OPENAI_DEPLOYMENT_NAME || !process.env.AZURE_OPENAI_API_VERSION) {
         console.log('❌ Missing environment variables for Azure OpenAI');
         return null;
     }
@@ -28,7 +28,7 @@ function initializeOpenAI() {
             apiKey: process.env.AZURE_OPENAI_API_KEY,
             endpoint: process.env.AZURE_OPENAI_ENDPOINT,
             deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
-            apiVersion: process.env.OPENAI_API_VERSION
+            apiVersion: process.env.AZURE_OPENAI_API_VERSION
         });
         console.log('✅ Azure OpenAI instance created successfully');
         return openaiInstance;
@@ -48,7 +48,7 @@ const analyzeConversationResponse = async (req, res) => {
         console.log('- AZURE_OPENAI_API_KEY:', !!process.env.AZURE_OPENAI_API_KEY);
         console.log('- AZURE_OPENAI_ENDPOINT:', process.env.AZURE_OPENAI_ENDPOINT);
         console.log('- AZURE_OPENAI_DEPLOYMENT_NAME:', process.env.AZURE_OPENAI_DEPLOYMENT_NAME);
-        console.log('- OPENAI_API_VERSION:', process.env.OPENAI_API_VERSION);
+        console.log('- AZURE_OPENAI_API_VERSION:', process.env.AZURE_OPENAI_API_VERSION);
         // ✅ תיקון TypeScript - cast to any פשוט
         const userId = req.user?.userId || req.user?.id;
         if (!userId) {
@@ -79,7 +79,7 @@ const analyzeConversationResponse = async (req, res) => {
                         hasApiKey: !!process.env.AZURE_OPENAI_API_KEY,
                         hasEndpoint: !!process.env.AZURE_OPENAI_ENDPOINT,
                         hasDeployment: !!process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
-                        hasVersion: !!process.env.OPENAI_API_VERSION
+                        hasVersion: !!process.env.AZURE_OPENAI_API_VERSION
                     }
                 });
             }
