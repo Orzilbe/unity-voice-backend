@@ -5,17 +5,35 @@ import { AppError } from './errorHandler';
 import { TokenPayload, IUserRequest } from '../types/auth';
 
 export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunction) => {
-  // ✅ קריאה מcookies במקום מheaders
-  const token = req.cookies?.authToken;
+  let token: string | undefined;
+
+  // ✅ גישה היברידית: נסה קודם cookies (לפיתוח), אחר כך Authorization header (לproduction)
+  
+  // 1. נסה לקרוא מcookies (פיתוח מקומי)
+  if (req.cookies?.authToken) {
+    token = req.cookies.authToken;
+    console.log('🍪 Token found in cookies');
+  }
+  
+  // 2. אם אין cookie, נסה Authorization header (production)
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+      console.log('🔑 Token found in Authorization header');
+    }
+  }
 
   console.log('🔍 Auth middleware - checking token:', {
     hasCookies: !!req.cookies,
     hasAuthToken: !!token,
-    cookieKeys: req.cookies ? Object.keys(req.cookies) : []
+    cookieKeys: req.cookies ? Object.keys(req.cookies) : [],
+    hasAuthHeader: !!req.headers.authorization,
+    environment: process.env.NODE_ENV
   });
 
   if (!token) {
-    console.log('❌ No token found in cookies');
+    console.log('❌ No token found in cookies or Authorization header');
     return next(new AppError('No token provided', 401));
   }
 

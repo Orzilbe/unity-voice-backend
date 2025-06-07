@@ -1,44 +1,25 @@
 // unity-voice-backend/src/routes/authRoutes.ts
 import express, { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import { UserRole, AgeRange, EnglishLevel } from '../models/User';
 import validator from 'validator';
 import bcrypt from 'bcryptjs';
 import DatabaseConnection from '../config/database';
-import { errorHandler } from '../middleware/errorHandler';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { initializeUserLevels } from '../services/userLevelService';
 import { IUserRequest } from '../types/auth';
 
 const router = express.Router();
 
-// ✅ הגדרת אפשרויות cookies מתוקנת לproduction
+// ✅ הגדרת אפשרויות cookies לפיתוח מקומי בלבד
 const cookieOptions = {
-  httpOnly: true, // לא נגיש ל-JavaScript - מונע XSS
-  secure: process.env.NODE_ENV === 'production', // HTTPS בלבד בפרודקשן
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const, // ✅ חשוב לcross-domain
-  maxAge: 24 * 60 * 60 * 1000, // 24 שעות במילישניות
-  path: '/', // זמין לכל המסלולים
+  httpOnly: true,
+  secure: false, // false לפיתוח מקומי
+  sameSite: 'lax' as const,
+  maxAge: 24 * 60 * 60 * 1000,
+  path: '/',
 };
-
-// ✅ נתיב debug לבדיקת cookies - ראשון ברשימה
-router.get('/debug/cookies', (req, res) => {
-  console.log('🔍 Debug cookies requested from authRoutes');
-  res.json({
-    message: 'Cookie debug information from authRoutes',
-    cookies: req.cookies || {},
-    headers: {
-      cookie: req.headers.cookie || 'No cookie header',
-      origin: req.headers.origin || 'No origin header',
-      'user-agent': req.headers['user-agent'] || 'No user agent'
-    },
-    environment: process.env.NODE_ENV,
-    cookieOptions: cookieOptions,
-    timestamp: new Date().toISOString()
-  });
-});
 
 router.post('/validate', authMiddleware, (req: IUserRequest, res) => {
   res.json({ 
@@ -94,26 +75,28 @@ router.post('/login', async (req, res) => {
       [user.UserId]
     );
 
-    // ✅ הגדרת cookie עם הגדרות מתוקנות + לוגים
-    console.log('🍪 Setting auth cookie for login:', {
+    console.log('🍪 Login successful:', {
       email: user.Email,
       environment: process.env.NODE_ENV,
-      cookieOptions,
       tokenLength: token.length
     });
     
-    res.cookie('authToken', token, cookieOptions);
+    // ✅ גישה היברידית: cookies לפיתוח + token לproduction
+    if (process.env.NODE_ENV === 'development') {
+      // פיתוח מקומי - השתמש בcookies
+      res.cookie('authToken', token, cookieOptions);
+    }
 
-    // ✅ החזרת תגובה ללא טוקן אבל עם success: true
+    // ✅ תמיד החזר גם token לfrontend (לproduction)
     res.json({
-      success: true, // ✅ חשוב!
+      success: true,
+      token: token, // ✅ החזרנו את זה לproduction
       user: {
         id: user.UserId,
         userId: user.UserId,
         email: user.Email
       },
-      cookieSet: true,
-      cookieOptions: cookieOptions // ✅ לdebug
+      cookieSet: process.env.NODE_ENV === 'development'
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -137,6 +120,7 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
       ageRange
     } = req.body;
 
+    // Validation
     const errors = [];
     
     if (!email || !validator.isEmail(email)) {
@@ -174,7 +158,10 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
 
     const existingUser = await User.findByEmail(email);
     if (existingUser) {
-      return res.status(409).json({ message: 'User with this email already exists' });
+      return res.status(409).json({ 
+        success: false,
+        message: 'User with this email already exists' 
+      });
     }
 
     const userId = await User.create({
@@ -201,21 +188,24 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
       { expiresIn: '7d' }
     );
 
-    // ✅ הגדרת cookie עם לוגים
-    console.log('🍪 Setting auth cookie for registration:', {
+    console.log('🍪 Registration successful:', {
       email,
       userId,
       environment: process.env.NODE_ENV
     });
 
-    res.cookie('authToken', token, {
-      ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ימים לרישום
-    });
+    // ✅ גישה היברידית: cookies לפיתוח + token לproduction
+    if (process.env.NODE_ENV === 'development') {
+      res.cookie('authToken', token, {
+        ...cookieOptions,
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ימים
+      });
+    }
 
     return res.status(201).json({ 
       success: true,
-      message: 'User registered successfully', 
+      message: 'User registered successfully',
+      token: token, // ✅ החזרנו את זה לproduction
       user: {
         id: userId,
         userId: userId.toString(),
@@ -225,7 +215,7 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
         englishLevel,
         role: UserRole.USER
       },
-      cookieSet: true
+      cookieSet: process.env.NODE_ENV === 'development'
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -233,17 +223,18 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
   }
 });
 
-// ✅ נתיב logout עם לוגים
 router.post('/logout', (req, res) => {
-  console.log('🚪 Logout requested, clearing cookie');
+  console.log('🚪 Logout requested');
   
-  // מחיקת ה-cookie
-  res.clearCookie('authToken', { 
-    path: '/',
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-  });
+  // מחיקת cookie אם זה פיתוח מקומי
+  if (process.env.NODE_ENV === 'development') {
+    res.clearCookie('authToken', { 
+      path: '/',
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax'
+    });
+  }
   
   res.json({ 
     success: true,
@@ -254,17 +245,8 @@ router.post('/logout', (req, res) => {
 router.get('/register', (req: Request, res: Response) => {
   res.status(405).json({
     message: 'Method not allowed',
-    details: 'Registration requires a POST request with user data. GET requests are not supported for registration.',
-    expectedMethod: 'POST',
-    expectedBody: {
-      email: 'string',
-      firstName: 'string',
-      lastName: 'string',
-      phoneNumber: 'string',
-      password: 'string',
-      englishLevel: 'beginner|intermediate|advanced',
-      ageRange: 'string'
-    }
+    details: 'Registration requires a POST request with user data.',
+    expectedMethod: 'POST'
   });
 });
 
