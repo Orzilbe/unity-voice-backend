@@ -6,8 +6,6 @@ import { TokenPayload, IUserRequest } from '../types/auth';
 
 export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunction) => {
   let token: string | undefined;
-
-  // ✅ גישה היברידית: נסה קודם cookies (לפיתוח), אחר כך Authorization header (לproduction)
   
   // 1. נסה לקרוא מcookies (פיתוח מקומי)
   if (req.cookies?.authToken) {
@@ -23,27 +21,34 @@ export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunct
       console.log('🔑 Token found in Authorization header');
     }
   }
-
+  
+  // ✅ 3. הוסף את זה - נסה גם מ-body (לvalidate endpoint)
+  if (!token && req.body?.token) {
+    token = req.body.token;
+    console.log('📝 Token found in request body');
+  }
+  
   console.log('🔍 Auth middleware - checking token:', {
     hasCookies: !!req.cookies,
     hasAuthToken: !!token,
     cookieKeys: req.cookies ? Object.keys(req.cookies) : [],
     hasAuthHeader: !!req.headers.authorization,
+    hasBodyToken: !!req.body?.token,
     environment: process.env.NODE_ENV
   });
-
+  
   if (!token) {
-    console.log('❌ No token found in cookies or Authorization header');
+    console.log('❌ No token found in cookies, Authorization header, or body');
     return next(new AppError('No token provided', 401));
   }
-
+  
   try {
     const secret = process.env.JWT_SECRET;
     
     if (!secret) {
       throw new Error('JWT secret is not defined');
     }
-
+    
     const decoded = jwt.verify(token, secret) as TokenPayload;
     
     console.log('✅ Token verified successfully:', {
