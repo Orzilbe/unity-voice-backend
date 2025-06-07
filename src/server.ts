@@ -177,7 +177,47 @@ app.get('/api/debug/routes', (req: Request, res: Response) => {
     }
   });
 });
+// ✅ Debug route ישיר לבדיקת cookies - הוסיפי את זה אחרי app.use(cookieParser());
+app.get('/api/auth/debug/cookies', (req: Request, res: Response) => {
+  console.log('🔍 Direct debug cookies requested from server.ts');
+  res.json({
+    message: 'Direct cookie debug from server.ts',
+    cookies: req.cookies || {},
+    headers: {
+      cookie: req.headers.cookie || 'No cookie header',
+      origin: req.headers.origin || 'No origin header',
+      'user-agent': req.headers['user-agent'] || 'No user agent'
+    },
+    environment: process.env.NODE_ENV,
+    corsOrigin: process.env.CORS_ORIGIN,
+    timestamp: new Date().toISOString()
+  });
+});
 
+// ✅ Test login route ישיר - לבדיקה
+app.post('/api/auth/test-login', async (req: Request, res: Response) => {
+  console.log('🧪 Test login requested from server.ts');
+  
+  const testToken = 'test-token-' + Date.now();
+  
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const,
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/',
+  };
+  
+  console.log('🍪 Setting test cookie with options:', cookieOptions);
+  res.cookie('authToken', testToken, cookieOptions);
+  
+  res.json({
+    success: true,
+    message: 'Test cookie set from server.ts',
+    cookieOptions,
+    testToken: testToken.substring(0, 20) + '...'
+  });
+});
 // API Routes - ✅ סדר נכון וללא כפילויות
 app.use('/api/auth', authRoutes);
 app.use('/api/topics', topicsRoutes);
