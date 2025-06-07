@@ -1,4 +1,4 @@
-// unity-voice-backend/src/models/Task.ts - תיקון לשימוש ב-StartDate
+// unity-voice-backend/src/models/Task.ts
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import pool from './db';
 
