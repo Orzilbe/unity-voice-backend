@@ -12,18 +12,20 @@ import { IUserRequest } from '../types/auth';
 
 const router = express.Router();
 
-// ✅ הגדרת אפשרויות cookies
+// ✅ הגדרת אפשרויות cookies מתוקנת לproduction
 const cookieOptions = {
   httpOnly: true, // לא נגיש ל-JavaScript - מונע XSS
   secure: process.env.NODE_ENV === 'production', // HTTPS בלבד בפרודקשן
-  sameSite: 'strict' as const, // מונע CSRF
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const, // ✅ חשוב לcross-domain
   maxAge: 24 * 60 * 60 * 1000, // 24 שעות במילישניות
-  path: '/' // זמין לכל המסלולים
+  path: '/', // זמין לכל המסלולים
+  domain: process.env.NODE_ENV === 'production' ? undefined : undefined // ✅ לא מגדירים domain בפרודקשן
 };
 
 router.post('/validate', authMiddleware, (req: IUserRequest, res) => {
   res.json({ 
     valid: true, 
+    success: true,
     user: req.user || null
   });
 });
@@ -74,7 +76,12 @@ router.post('/login', async (req, res) => {
       [user.UserId]
     );
 
-    // ✅ הגדרת cookie במקום החזרת טוקן בגוף התגובה
+    // ✅ הגדרת cookie עם הגדרות מתוקנות
+    console.log('🍪 Setting cookie with options:', {
+      ...cookieOptions,
+      tokenLength: token.length
+    });
+    
     res.cookie('authToken', token, cookieOptions);
 
     // ✅ החזרת תגובה ללא טוקן
@@ -84,7 +91,8 @@ router.post('/login', async (req, res) => {
         id: user.UserId,
         userId: user.UserId,
         email: user.Email
-      }
+      },
+      cookieSet: true // ✅ אינדיקטור שהcookie נקבע
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -189,7 +197,8 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
         lastName,
         englishLevel,
         role: UserRole.USER
-      }
+      },
+      cookieSet: true
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -197,19 +206,34 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
   }
 });
 
-// ✅ נתיב logout חדש
+// ✅ נתיב logout עם לוגים
 router.post('/logout', (req, res) => {
+  console.log('🚪 Logout requested, clearing cookie');
+  
   // מחיקת ה-cookie
   res.clearCookie('authToken', { 
     path: '/',
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
   });
   
   res.json({ 
     success: true,
     message: 'Logged out successfully' 
+  });
+});
+
+// ✅ נתיב debug לבדיקת cookies
+router.get('/debug/cookies', (req, res) => {
+  res.json({
+    cookies: req.cookies || {},
+    headers: {
+      cookie: req.headers.cookie || 'No cookie header',
+      origin: req.headers.origin || 'No origin header'
+    },
+    environment: process.env.NODE_ENV,
+    cookieOptions: cookieOptions
   });
 });
 
