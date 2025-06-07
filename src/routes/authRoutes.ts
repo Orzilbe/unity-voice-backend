@@ -21,12 +21,51 @@ const cookieOptions = {
   path: '/',
 };
 
-router.post('/validate', authMiddleware, (req: IUserRequest, res) => {
-  res.json({ 
-    valid: true,
-    success: true, 
-    user: req.user || null
-  });
+// ✅ תיקון validate endpoint
+router.post('/validate', async (req, res) => {
+  try {
+    console.log('🔍 Token validation request received');
+    
+    // קבל טוקן מה-header או מה-body
+    let token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token && req.body.token) {
+      token = req.body.token;
+    }
+    
+    console.log('🔍 Token found:', token ? 'Yes' : 'No');
+    
+    if (!token) {
+      console.log('❌ No token provided');
+      return res.status(401).json({ 
+        success: false,
+        valid: false,
+        message: 'No token provided' 
+      });
+    }
+
+    // בדוק את הטוקן
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    
+    console.log('✅ Token validation successful:', { userId: decoded.userId || decoded.id });
+    
+    res.json({ 
+      success: true,
+      valid: true,
+      user: {
+        id: decoded.id || decoded.userId,
+        userId: decoded.userId || decoded.id,
+        email: decoded.email
+      }
+    });
+  } catch (error) {
+    console.error('❌ Token validation failed:', error);
+    res.status(401).json({ 
+      success: false,
+      valid: false,
+      message: 'Invalid token' 
+    });
+  }
 });
 
 router.post('/login', async (req, res) => {
