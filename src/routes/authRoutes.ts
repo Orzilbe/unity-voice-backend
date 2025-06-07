@@ -14,9 +14,36 @@ import { IUserRequest } from '../types/auth';
 
 const router = express.Router();
 
+// ✅ הגדרת אפשרויות cookies מתוקנת לproduction
+const cookieOptions = {
+  httpOnly: true, // לא נגיש ל-JavaScript - מונע XSS
+  secure: process.env.NODE_ENV === 'production', // HTTPS בלבד בפרודקשן
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const, // ✅ חשוב לcross-domain
+  maxAge: 24 * 60 * 60 * 1000, // 24 שעות במילישניות
+  path: '/', // זמין לכל המסלולים
+};
+
+// ✅ נתיב debug לבדיקת cookies - ראשון ברשימה
+router.get('/debug/cookies', (req, res) => {
+  console.log('🔍 Debug cookies requested from authRoutes');
+  res.json({
+    message: 'Cookie debug information from authRoutes',
+    cookies: req.cookies || {},
+    headers: {
+      cookie: req.headers.cookie || 'No cookie header',
+      origin: req.headers.origin || 'No origin header',
+      'user-agent': req.headers['user-agent'] || 'No user agent'
+    },
+    environment: process.env.NODE_ENV,
+    cookieOptions: cookieOptions,
+    timestamp: new Date().toISOString()
+  });
+});
+
 router.post('/validate', authMiddleware, (req: IUserRequest, res) => {
   res.json({ 
-    valid: true, 
+    valid: true,
+    success: true, 
     user: req.user || null
   });
 });
@@ -34,6 +61,7 @@ router.post('/login', async (req, res) => {
 
     if (!users || (users as any[]).length === 0) {
       return res.status(401).json({ 
+        success: false,
         message: 'User not found',
         details: `No user found with email: ${email}`
       });
@@ -45,6 +73,7 @@ router.post('/login', async (req, res) => {
 
     if (!isPasswordValid) {
       return res.status(401).json({ 
+        success: false,
         message: 'Invalid password',
         details: 'The provided password does not match our records'
       });
@@ -65,17 +94,31 @@ router.post('/login', async (req, res) => {
       [user.UserId]
     );
 
+    // ✅ הגדרת cookie עם הגדרות מתוקנות + לוגים
+    console.log('🍪 Setting auth cookie for login:', {
+      email: user.Email,
+      environment: process.env.NODE_ENV,
+      cookieOptions,
+      tokenLength: token.length
+    });
+    
+    res.cookie('authToken', token, cookieOptions);
+
+    // ✅ החזרת תגובה ללא טוקן אבל עם success: true
     res.json({
-      token,
+      success: true, // ✅ חשוב!
       user: {
         id: user.UserId,
         userId: user.UserId,
         email: user.Email
-      }
+      },
+      cookieSet: true,
+      cookieOptions: cookieOptions // ✅ לdebug
     });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ 
+      success: false,
       message: 'Server error during login',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -158,9 +201,21 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
       { expiresIn: '7d' }
     );
 
+    // ✅ הגדרת cookie עם לוגים
+    console.log('🍪 Setting auth cookie for registration:', {
+      email,
+      userId,
+      environment: process.env.NODE_ENV
+    });
+
+    res.cookie('authToken', token, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ימים לרישום
+    });
+
     return res.status(201).json({ 
+      success: true,
       message: 'User registered successfully', 
-      token,
       user: {
         id: userId,
         userId: userId.toString(),
@@ -169,12 +224,31 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
         lastName,
         englishLevel,
         role: UserRole.USER
-      }
+      },
+      cookieSet: true
     });
   } catch (error) {
     console.error('Registration error:', error);
     next(error);
   }
+});
+
+// ✅ נתיב logout עם לוגים
+router.post('/logout', (req, res) => {
+  console.log('🚪 Logout requested, clearing cookie');
+  
+  // מחיקת ה-cookie
+  res.clearCookie('authToken', { 
+    path: '/',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  });
+  
+  res.json({ 
+    success: true,
+    message: 'Logged out successfully' 
+  });
 });
 
 router.get('/register', (req: Request, res: Response) => {
@@ -232,4 +306,4 @@ router.get('/debug-user', async (req, res) => {
   }
 });
 
-export default router; 
+export default router;
