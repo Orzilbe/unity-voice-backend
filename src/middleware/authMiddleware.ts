@@ -1,4 +1,4 @@
-// unity-voice-backend/src/middleware/authMiddleware.ts
+// unity-voice-backend/src/middleware/authMiddleware.ts - תיקון סופי
 import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './errorHandler';
@@ -7,22 +7,20 @@ import { TokenPayload, IUserRequest } from '../types/auth';
 export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunction) => {
   let token: string | undefined;
   
-  // 1. נסה לקרוא מcookies (פיתוח מקומי)
-  if (req.cookies?.authToken) {
+  // ✅ 1. נסה לקרוא מ-Authorization header קודם (לproduction)
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+    console.log('🔑 Token found in Authorization header');
+  }
+  
+  // ✅ 2. אם אין header, נסה cookies (לפיתוח מקומי)
+  if (!token && req.cookies?.authToken) {
     token = req.cookies.authToken;
     console.log('🍪 Token found in cookies');
   }
   
-  // 2. אם אין cookie, נסה Authorization header (production)
-  if (!token) {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.split(' ')[1];
-      console.log('🔑 Token found in Authorization header');
-    }
-  }
-  
-  // ✅ 3. הוסף את זה - נסה גם מ-body (לvalidate endpoint)
+  // ✅ 3. אם אין באף אחד, נסה גם מ-body (לvalidate endpoint)
   if (!token && req.body?.token) {
     token = req.body.token;
     console.log('📝 Token found in request body');
@@ -38,7 +36,7 @@ export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunct
   });
   
   if (!token) {
-    console.log('❌ No token found in cookies, Authorization header, or body');
+    console.log('❌ No token found in Authorization header, cookies, or body');
     return next(new AppError('No token provided', 401));
   }
   
