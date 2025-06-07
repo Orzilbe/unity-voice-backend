@@ -7,13 +7,16 @@ exports.authenticateToken = exports.authMiddleware = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const errorHandler_1 = require("./errorHandler");
 const authMiddleware = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    // ✅ קריאה מcookies במקום מheaders
+    const token = req.cookies?.authToken;
+    console.log('🔍 Auth middleware - checking token:', {
+        hasCookies: !!req.cookies,
+        hasAuthToken: !!token,
+        cookieKeys: req.cookies ? Object.keys(req.cookies) : []
+    });
+    if (!token) {
+        console.log('❌ No token found in cookies');
         return next(new errorHandler_1.AppError('No token provided', 401));
-    }
-    const [bearer, token] = authHeader.split(' ');
-    if (bearer !== 'Bearer' || !token) {
-        return next(new errorHandler_1.AppError('Invalid token format', 401));
     }
     try {
         const secret = process.env.JWT_SECRET;
@@ -21,6 +24,10 @@ const authMiddleware = (req, res, next) => {
             throw new Error('JWT secret is not defined');
         }
         const decoded = jsonwebtoken_1.default.verify(token, secret);
+        console.log('✅ Token verified successfully:', {
+            userId: decoded.id || decoded.userId,
+            email: decoded.email
+        });
         // Ensure we have userId in the request for the new APIs
         req.user = {
             ...decoded,
@@ -29,6 +36,7 @@ const authMiddleware = (req, res, next) => {
         next();
     }
     catch (error) {
+        console.log('❌ Token verification failed:', error);
         if (error instanceof jsonwebtoken_1.default.TokenExpiredError) {
             return next(new errorHandler_1.AppError('Token expired', 401));
         }

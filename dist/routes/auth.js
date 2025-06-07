@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// unity-voice-backend/src/routes/auth.ts (CLEAN VERSION - ROUTES ONLY)
+// unity-voice-backend/src/routes/auth.ts
 const express_1 = __importDefault(require("express"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_1 = __importDefault(require("../models/User"));
@@ -14,6 +14,14 @@ const database_1 = __importDefault(require("../config/database"));
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const userLevelService_1 = require("../services/userLevelService");
 const router = express_1.default.Router();
+// ✅ הגדרת אפשרויות cookies
+const cookieOptions = {
+    httpOnly: true, // לא נגיש ל-JavaScript - מונע XSS
+    secure: process.env.NODE_ENV === 'production', // HTTPS בלבד בפרודקשן
+    sameSite: 'strict', // מונע CSRF
+    maxAge: 24 * 60 * 60 * 1000, // 24 שעות במילישניות
+    path: '/' // זמין לכל המסלולים
+};
 router.post('/validate', authMiddleware_1.authMiddleware, (req, res) => {
     res.json({
         valid: true,
@@ -27,6 +35,7 @@ router.post('/login', async (req, res) => {
         const [users] = await pool.query('SELECT UserId, Email, Password FROM Users WHERE Email = ?', [email]);
         if (!users || users.length === 0) {
             return res.status(401).json({
+                success: false,
                 message: 'User not found',
                 details: `No user found with email: ${email}`
             });
@@ -35,6 +44,7 @@ router.post('/login', async (req, res) => {
         const isPasswordValid = await bcryptjs_1.default.compare(password, user.Password);
         if (!isPasswordValid) {
             return res.status(401).json({
+                success: false,
                 message: 'Invalid password',
                 details: 'The provided password does not match our records'
             });
@@ -45,8 +55,11 @@ router.post('/login', async (req, res) => {
             email: user.Email
         }, process.env.JWT_SECRET, { expiresIn: '24h' });
         await pool.query('UPDATE Users SET LastLogin = NOW() WHERE UserId = ?', [user.UserId]);
+        // ✅ הגדרת cookie במקום החזרת טוקן בגוף התגובה
+        res.cookie('authToken', token, cookieOptions);
+        // ✅ החזרת תגובה ללא טוקן
         res.json({
-            token,
+            success: true,
             user: {
                 id: user.UserId,
                 userId: user.UserId,
@@ -57,6 +70,7 @@ router.post('/login', async (req, res) => {
     catch (error) {
         console.error('Login error:', error);
         res.status(500).json({
+            success: false,
             message: 'Server error during login',
             details: error instanceof Error ? error.message : 'Unknown error'
         });
@@ -112,9 +126,14 @@ router.post('/register', async (req, res, next) => {
             email,
             role: User_2.UserRole.USER
         }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '7d' });
+        // ✅ הגדרת cookie במקום החזרת טוקן בגוף התגובה
+        res.cookie('authToken', token, {
+            ...cookieOptions,
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ימים לרישום
+        });
         return res.status(201).json({
+            success: true,
             message: 'User registered successfully',
-            token,
             user: {
                 id: userId,
                 userId: userId.toString(),
@@ -130,6 +149,20 @@ router.post('/register', async (req, res, next) => {
         console.error('Registration error:', error);
         next(error);
     }
+});
+// ✅ נתיב logout חדש
+router.post('/logout', (req, res) => {
+    // מחיקת ה-cookie
+    res.clearCookie('authToken', {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict'
+    });
+    res.json({
+        success: true,
+        message: 'Logged out successfully'
+    });
 });
 router.get('/register', (req, res) => {
     res.status(405).json({

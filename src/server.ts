@@ -2,6 +2,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser'; // ✅ הוספה חדשה
 import dotenv from 'dotenv';
 import { initializeDatabase } from './models';
 
@@ -45,13 +46,21 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// ✅ Middleware - סדר חשוב!
 app.use(helmet()); // Adds security headers
+
+// ✅ CORS עודכן לתמיכה בcookies
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000', // כתובת הfrontend
+  credentials: true, // ✅ חיוני לcookies!
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Set-Cookie'] // ✅ חשוב לcookies
 }));
+
+// ✅ Cookie parser - חייב להיות לפני הroutes!
+app.use(cookieParser());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -60,7 +69,8 @@ app.get('/', (req: Request, res: Response) => {
   res.status(200).json({ 
     message: "Unity Voice API is running", 
     status: "ok",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    cookieSupport: "enabled" // ✅ אינדיקטור שcookies מופעלים
   });
 });
 
@@ -75,6 +85,8 @@ app.get('/health', async (req: Request, res: Response) => {
     res.status(200).json({ 
       status: 'healthy',
       database: 'connected',
+      cookieParser: 'enabled',
+      cors: 'configured for credentials',
       timestamp: new Date().toISOString() 
     });
   } catch (error) {
@@ -95,6 +107,28 @@ app.get('/api/health', (req: Request, res: Response) => {
     status: 'healthy',
     api: 'Unity Voice API',
     version: '1.0.0',
+    features: {
+      cookieAuth: true,
+      cors: true,
+      helmet: true
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✅ Debug route עם מידע על cookies
+app.get('/api/debug/auth', (req: Request, res: Response) => {
+  res.json({
+    message: 'Auth Debug Information',
+    headers: {
+      authorization: req.headers.authorization ? 'Present' : 'Missing',
+      cookie: req.headers.cookie ? 'Present' : 'Missing'
+    },
+    cookies: {
+      available: Object.keys(req.cookies || {}),
+      authToken: req.cookies?.authToken ? 'Present' : 'Missing'
+    },
+    corsOrigin: process.env.CORS_ORIGIN,
     timestamp: new Date().toISOString()
   });
 });
@@ -137,7 +171,9 @@ app.get('/api/debug/routes', (req: Request, res: Response) => {
     serverInfo: {
       timestamp: new Date().toISOString(),
       nodeEnv: process.env.NODE_ENV,
-      port: PORT
+      port: PORT,
+      cookieParserEnabled: true,
+      corsCredentials: true
     }
   });
 });
@@ -194,8 +230,11 @@ initializeDatabase().then(() => {
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📍 Available at: http://localhost:${PORT}`);
     console.log(`🔍 Debug routes at: http://localhost:${PORT}/api/debug/routes`);
+    console.log(`🔐 Debug auth at: http://localhost:${PORT}/api/debug/auth`);
     console.log(`📝 wordsToTaskRoutes loaded: ${!!wordsToTaskRoutes ? 'Yes' : 'No'}`);
     console.log(`🔥 Conversation analysis routes registered`);
+    console.log(`🍪 Cookie parser enabled for authentication`);
+    console.log(`🌐 CORS configured for: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}`);
   });
 }).catch(error => {
   console.error('❌ Failed to initialize database:', error);

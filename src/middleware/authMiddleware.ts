@@ -1,20 +1,22 @@
-// unity-voice-backend/src/middleware/authMiddleware.ts (CLEAN VERSION - MIDDLEWARE ONLY)
+// unity-voice-backend/src/middleware/authMiddleware.ts
 import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from './errorHandler';
 import { TokenPayload, IUserRequest } from '../types/auth';
 
 export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
+  // ✅ קריאה מcookies במקום מheaders
+  const token = req.cookies?.authToken;
 
-  if (!authHeader) {
+  console.log('🔍 Auth middleware - checking token:', {
+    hasCookies: !!req.cookies,
+    hasAuthToken: !!token,
+    cookieKeys: req.cookies ? Object.keys(req.cookies) : []
+  });
+
+  if (!token) {
+    console.log('❌ No token found in cookies');
     return next(new AppError('No token provided', 401));
-  }
-
-  const [bearer, token] = authHeader.split(' ');
-
-  if (bearer !== 'Bearer' || !token) {
-    return next(new AppError('Invalid token format', 401));
   }
 
   try {
@@ -26,6 +28,11 @@ export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunct
 
     const decoded = jwt.verify(token, secret) as TokenPayload;
     
+    console.log('✅ Token verified successfully:', {
+      userId: decoded.id || decoded.userId,
+      email: decoded.email
+    });
+    
     // Ensure we have userId in the request for the new APIs
     req.user = {
       ...decoded,
@@ -34,6 +41,8 @@ export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunct
     
     next();
   } catch (error) {
+    console.log('❌ Token verification failed:', error);
+    
     if (error instanceof jwt.TokenExpiredError) {
       return next(new AppError('Token expired', 401));
     }

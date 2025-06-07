@@ -1,4 +1,4 @@
-// unity-voice-backend/src/routes/auth.ts (CLEAN VERSION - ROUTES ONLY)
+// unity-voice-backend/src/routes/auth.ts
 import express, { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
@@ -11,6 +11,15 @@ import { initializeUserLevels } from '../services/userLevelService';
 import { IUserRequest } from '../types/auth';
 
 const router = express.Router();
+
+// ✅ הגדרת אפשרויות cookies
+const cookieOptions = {
+  httpOnly: true, // לא נגיש ל-JavaScript - מונע XSS
+  secure: process.env.NODE_ENV === 'production', // HTTPS בלבד בפרודקשן
+  sameSite: 'strict' as const, // מונע CSRF
+  maxAge: 24 * 60 * 60 * 1000, // 24 שעות במילישניות
+  path: '/' // זמין לכל המסלולים
+};
 
 router.post('/validate', authMiddleware, (req: IUserRequest, res) => {
   res.json({ 
@@ -32,6 +41,7 @@ router.post('/login', async (req, res) => {
 
     if (!users || (users as any[]).length === 0) {
       return res.status(401).json({ 
+        success: false,
         message: 'User not found',
         details: `No user found with email: ${email}`
       });
@@ -43,6 +53,7 @@ router.post('/login', async (req, res) => {
 
     if (!isPasswordValid) {
       return res.status(401).json({ 
+        success: false,
         message: 'Invalid password',
         details: 'The provided password does not match our records'
       });
@@ -63,8 +74,12 @@ router.post('/login', async (req, res) => {
       [user.UserId]
     );
 
+    // ✅ הגדרת cookie במקום החזרת טוקן בגוף התגובה
+    res.cookie('authToken', token, cookieOptions);
+
+    // ✅ החזרת תגובה ללא טוקן
     res.json({
-      token,
+      success: true,
       user: {
         id: user.UserId,
         userId: user.UserId,
@@ -74,6 +89,7 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ 
+      success: false,
       message: 'Server error during login',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -156,9 +172,15 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
       { expiresIn: '7d' }
     );
 
+    // ✅ הגדרת cookie במקום החזרת טוקן בגוף התגובה
+    res.cookie('authToken', token, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ימים לרישום
+    });
+
     return res.status(201).json({ 
+      success: true,
       message: 'User registered successfully', 
-      token,
       user: {
         id: userId,
         userId: userId.toString(),
@@ -173,6 +195,22 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     console.error('Registration error:', error);
     next(error);
   }
+});
+
+// ✅ נתיב logout חדש
+router.post('/logout', (req, res) => {
+  // מחיקת ה-cookie
+  res.clearCookie('authToken', { 
+    path: '/',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  });
+  
+  res.json({ 
+    success: true,
+    message: 'Logged out successfully' 
+  });
 });
 
 router.get('/register', (req: Request, res: Response) => {
