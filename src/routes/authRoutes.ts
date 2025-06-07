@@ -21,33 +21,55 @@ const cookieOptions = {
   path: '/',
 };
 
-// ✅ תיקון validate endpoint
+// ✅ תיקון validate endpoint עם debug מתקדם
 router.post('/validate', async (req, res) => {
   try {
     console.log('🔍 Token validation request received');
+    console.log('📋 Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('📋 Body:', JSON.stringify(req.body, null, 2));
+    console.log('🍪 Cookies:', JSON.stringify(req.cookies, null, 2));
     
-    // קבל טוקן מה-header או מה-body
+    // קבל טוכן מה-header או מה-body
     let token = req.headers.authorization?.replace('Bearer ', '');
     
     if (!token && req.body.token) {
       token = req.body.token;
+      console.log('📝 Token found in request body');
+    }
+    
+    // 🆕 גם ננסה לחפש בcookies
+    if (!token && req.cookies?.authToken) {
+      token = req.cookies.authToken;
+      console.log('🍪 Token found in cookies');
     }
     
     console.log('🔍 Token found:', token ? 'Yes' : 'No');
+    console.log('🔍 Token preview:', token ? token.substring(0, 20) + '...' : 'None');
     
     if (!token) {
       console.log('❌ No token provided');
       return res.status(401).json({ 
         success: false,
         valid: false,
-        message: 'No token provided' 
+        message: 'No token provided',
+        debug: {
+          hasAuthHeader: !!req.headers.authorization,
+          hasBodyToken: !!req.body.token,
+          hasCookieToken: !!req.cookies?.authToken,
+          cookieKeys: req.cookies ? Object.keys(req.cookies) : [],
+          headerKeys: Object.keys(req.headers)
+        }
       });
     }
 
     // בדוק את הטוקן
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
     
-    console.log('✅ Token validation successful:', { userId: decoded.userId || decoded.id });
+    console.log('✅ Token validation successful:', { 
+      userId: decoded.userId || decoded.id,
+      email: decoded.email,
+      tokenType: typeof decoded
+    });
     
     res.json({ 
       success: true,
@@ -63,7 +85,12 @@ router.post('/validate', async (req, res) => {
     res.status(401).json({ 
       success: false,
       valid: false,
-      message: 'Invalid token' 
+      message: 'Invalid token',
+      debug: {
+        errorType: error instanceof Error ? error.name : 'Unknown',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        hasJwtSecret: !!process.env.JWT_SECRET
+      }
     });
   }
 });
@@ -72,6 +99,8 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    console.log('🔐 Login attempt for:', email);
+    
     const pool = DatabaseConnection.getPool();
     
     const [users] = await pool.query(
@@ -80,6 +109,7 @@ router.post('/login', async (req, res) => {
     );
 
     if (!users || (users as any[]).length === 0) {
+      console.log('❌ User not found:', email);
       return res.status(401).json({ 
         success: false,
         message: 'User not found',
@@ -88,10 +118,12 @@ router.post('/login', async (req, res) => {
     }
 
     const user = (users as any[])[0];
+    console.log('✅ User found:', user.UserId);
 
     const isPasswordValid = await bcrypt.compare(password, user.Password);
 
     if (!isPasswordValid) {
+      console.log('❌ Invalid password for:', email);
       return res.status(401).json({ 
         success: false,
         message: 'Invalid password',
@@ -116,14 +148,17 @@ router.post('/login', async (req, res) => {
 
     console.log('🍪 Login successful:', {
       email: user.Email,
+      userId: user.UserId,
       environment: process.env.NODE_ENV,
-      tokenLength: token.length
+      tokenLength: token.length,
+      tokenPreview: token.substring(0, 20) + '...'
     });
     
     // ✅ גישה היברידית: cookies לפיתוח + token לproduction
     if (process.env.NODE_ENV === 'development') {
       // פיתוח מקומי - השתמש בcookies
       res.cookie('authToken', token, cookieOptions);
+      console.log('🍪 Cookie set for development');
     }
 
     // ✅ תמיד החזר גם token לfrontend (לproduction)
@@ -135,7 +170,8 @@ router.post('/login', async (req, res) => {
         userId: user.UserId,
         email: user.Email
       },
-      cookieSet: process.env.NODE_ENV === 'development'
+      cookieSet: process.env.NODE_ENV === 'development',
+      message: 'Login successful'
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -158,6 +194,8 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
       englishLevel,
       ageRange
     } = req.body;
+
+    console.log('📝 Registration attempt for:', email);
 
     // Validation
     const errors = [];
@@ -192,11 +230,13 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     }
     
     if (errors.length > 0) {
+      console.log('❌ Validation errors:', errors);
       return res.status(400).json({ errors });
     }
 
     const existingUser = await User.findByEmail(email);
     if (existingUser) {
+      console.log('❌ User already exists:', email);
       return res.status(409).json({ 
         success: false,
         message: 'User with this email already exists' 
@@ -214,6 +254,8 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
       UserRole: UserRole.USER
     });
 
+    console.log('✅ User created:', userId);
+
     await initializeUserLevels(userId);
 
     const token = jwt.sign(
@@ -230,7 +272,8 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     console.log('🍪 Registration successful:', {
       email,
       userId,
-      environment: process.env.NODE_ENV
+      environment: process.env.NODE_ENV,
+      tokenPreview: token.substring(0, 20) + '...'
     });
 
     // ✅ גישה היברידית: cookies לפיתוח + token לproduction
@@ -239,6 +282,7 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
         ...cookieOptions,
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ימים
       });
+      console.log('🍪 Cookie set for development registration');
     }
 
     return res.status(201).json({ 
@@ -273,6 +317,7 @@ router.post('/logout', (req, res) => {
       secure: false,
       sameSite: 'lax'
     });
+    console.log('🍪 Cookie cleared for development');
   }
   
   res.json({ 
@@ -297,6 +342,8 @@ router.get('/debug-user', async (req, res) => {
   }
 
   try {
+    console.log('🔍 Debug user lookup for:', email);
+    
     const pool = DatabaseConnection.getPool();
     
     const [users] = await pool.query(
@@ -305,6 +352,7 @@ router.get('/debug-user', async (req, res) => {
     );
 
     if (!users || (users as any[]).length === 0) {
+      console.log('❌ Debug: User not found:', email);
       return res.status(404).json({ 
         message: 'User not found',
         details: `No user found with email: ${email}`
@@ -312,11 +360,13 @@ router.get('/debug-user', async (req, res) => {
     }
 
     const user = (users as any[])[0];
+    console.log('✅ Debug: User found:', user.UserId);
 
     res.json({
       userId: user.UserId,
       email: user.Email,
-      passwordHashLength: user.Password.length
+      passwordHashLength: user.Password.length,
+      passwordHashPreview: user.Password.substring(0, 10) + '...'
     });
   } catch (error) {
     console.error('Debug user error:', error);
