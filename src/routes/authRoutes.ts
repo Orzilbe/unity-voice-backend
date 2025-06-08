@@ -23,6 +23,10 @@ const cookieOptions = {
 
 // ✅ תיקון validate endpoint עם debug מתקדם
 router.post('/validate', async (req, res) => {
+  console.log('🔍 Raw Authorization header:', req.headers.authorization);
+  console.log('🔍 All headers:', Object.keys(req.headers));
+  console.log('🔍 Body:', req.body);
+  console.log('🔍 Cookies:', req.cookies);
   try {
     console.log('🔍 Token validation request received');
     console.log('📋 Headers:', JSON.stringify(req.headers, null, 2));
