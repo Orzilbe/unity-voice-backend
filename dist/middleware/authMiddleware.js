@@ -7,15 +7,39 @@ exports.authenticateToken = exports.authMiddleware = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const errorHandler_1 = require("./errorHandler");
 const authMiddleware = (req, res, next) => {
-    // ✅ קריאה מcookies במקום מheaders
-    const token = req.cookies?.authToken;
+    let token;
+    // ✅ 1. נסה לקרוא מ-Authorization header קודם (לproduction)
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+        if (authHeader.startsWith('Bearer ')) {
+            token = authHeader.split(' ')[1];
+            console.log('🔑 Token found in Authorization header (with Bearer)');
+        }
+        else {
+            token = authHeader;
+            console.log('🔑 Token found in Authorization header (without Bearer)');
+        }
+    }
+    // ✅ 2. אם אין header, נסה cookies (לפיתוח מקומי)
+    if (!token && req.cookies?.authToken) {
+        token = req.cookies.authToken;
+        console.log('🍪 Token found in cookies');
+    }
+    // ✅ 3. אם אין באף אחד, נסה גם מ-body (לvalidate endpoint)
+    if (!token && req.body?.token) {
+        token = req.body.token;
+        console.log('📝 Token found in request body');
+    }
     console.log('🔍 Auth middleware - checking token:', {
         hasCookies: !!req.cookies,
         hasAuthToken: !!token,
-        cookieKeys: req.cookies ? Object.keys(req.cookies) : []
+        cookieKeys: req.cookies ? Object.keys(req.cookies) : [],
+        hasAuthHeader: !!req.headers.authorization,
+        hasBodyToken: !!req.body?.token,
+        environment: process.env.NODE_ENV
     });
     if (!token) {
-        console.log('❌ No token found in cookies');
+        console.log('❌ No token found in Authorization header, cookies, or body');
         return next(new errorHandler_1.AppError('No token provided', 401));
     }
     try {
