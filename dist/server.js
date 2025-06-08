@@ -294,8 +294,8 @@ app.post('/api/auth/test-login', async (req, res) => {
 // API Routes - ✅ סדר נכון וללא כפילויות
 app.use('/api/auth', authRoutes_1.default);
 // ✅ הסרתי את topicsRoutes ו-userRoutes כי יש לנו routes זמניים למעלה
-// app.use('/api/topics', topicsRoutes); // ✅ מוסר זמנית
-// app.use('/api/user', userRoutes); // ✅ מוסר זמנית
+app.use('/api/topics', topicsRoutes); // ✅ מוסר זמנית
+app.use('/api/user', userRoutes); // ✅ מוסר זמנית
 app.use('/api/diagnostics', diagnosticRoutes_1.default);
 app.use('/api/tasks', taskRoutes_1.default);
 app.use('/api/user-words', userWordsRoutes_1.default);

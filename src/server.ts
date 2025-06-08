@@ -328,8 +328,8 @@ app.post('/api/auth/test-login', async (req: Request, res: Response) => {
 // API Routes - ✅ סדר נכון וללא כפילויות
 app.use('/api/auth', authRoutes);
 // ✅ הסרתי את topicsRoutes ו-userRoutes כי יש לנו routes זמניים למעלה
-// app.use('/api/topics', topicsRoutes); // ✅ מוסר זמנית
-// app.use('/api/user', userRoutes); // ✅ מוסר זמנית
+app.use('/api/topics', topicsRoutes); // ✅ מוסר זמנית
+app.use('/api/user', userRoutes); // ✅ מוסר זמנית
 app.use('/api/diagnostics', diagnosticRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/user-words', userWordsRoutes);
