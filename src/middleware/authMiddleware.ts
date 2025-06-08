@@ -9,10 +9,15 @@ export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunct
   
   // ✅ 1. נסה לקרוא מ-Authorization header קודם (לproduction)
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
+if (authHeader) {
+  if (authHeader.startsWith('Bearer ')) {
     token = authHeader.split(' ')[1];
-    console.log('🔑 Token found in Authorization header');
+    console.log('🔑 Token found in Authorization header (with Bearer)');
+  } else {
+    token = authHeader;
+    console.log('🔑 Token found in Authorization header (without Bearer)');
   }
+}
   
   // ✅ 2. אם אין header, נסה cookies (לפיתוח מקומי)
   if (!token && req.cookies?.authToken) {
