@@ -34,8 +34,11 @@ router.post('/validate', async (req, res) => {
     console.log('🍪 Cookies:', JSON.stringify(req.cookies, null, 2));
     
     // קבל טוכן מה-header או מה-body
-    let token = req.headers.authorization?.replace('Bearer ', '');
-    
+let token = req.headers.authorization;
+if (token) {
+  // אם יש Bearer, הסר אותו. אם אין, השאר כמו שזה
+  token = token.replace(/^Bearer\s+/i, '');
+}    
     if (!token && req.body.token) {
       token = req.body.token;
       console.log('📝 Token found in request body');
