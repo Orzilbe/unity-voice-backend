@@ -7,6 +7,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const database_1 = __importDefault(require("../config/database"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const router = express_1.default.Router();
 router.get('/profile', authMiddleware_1.authMiddleware, async (req, res) => {
     try {
@@ -16,7 +17,7 @@ router.get('/profile', authMiddleware_1.authMiddleware, async (req, res) => {
         const pool = database_1.default.getPool();
         // Fixed: Added Score field and using correct column name CreationDate
         const [users] = await pool.query(`
-SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName, Email, PhoneNumber, AgeRange
+      SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName, Email, PhoneNumber, AgeRange
       FROM Users 
       WHERE UserId = ?
     `, [req.user.id]);
@@ -104,9 +105,9 @@ router.get('/stats', authMiddleware_1.authMiddleware, async (req, res) => {
         });
     }
 });
-// 🔥 זה הEndpoint שמחליף authentication זמנית
+// ✅ Endpoint נכון עם authentication
 router.get('/data', async (req, res) => {
-    console.log('📝 User data endpoint called - bypassing auth temporarily');
+    console.log('📝 User data endpoint called');
     try {
         // אם יש Authorization header, ננסה לקבל את המשתמש האמיתי
         const authHeader = req.headers.authorization;
@@ -114,32 +115,34 @@ router.get('/data', async (req, res) => {
             console.log('🔍 Found auth header, trying to get real user data...');
             try {
                 const pool = database_1.default.getPool();
-                // נחפש משתמש לפי האימייל שבטוכן (או המשתמש הראשון)
+                const token = authHeader.replace('Bearer ', '').trim();
+                const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+                const userId = decoded.id || decoded.userId;
+                console.log('🔍 Decoded user ID:', userId);
                 const [users] = await pool.query(`
           SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName, Email, PhoneNumber, AgeRange
           FROM Users 
           WHERE UserId = ? 
           LIMIT 1
-        `);
+        `, [userId]);
                 if (users && users.length > 0) {
                     const user = users[0];
-                    const userId = user.UserId;
-                    console.log('✅ Found real user:', userId);
-                    // קבלת מספר המשימות שהושלמו
+                    console.log('✅ Found real user:', user.UserId);
+                    // קבלת מספר המשימות שהושלמו - משתמש ב-user.UserId
                     const [taskResults] = await pool.query(`
             SELECT COUNT(*) as completedTasks 
             FROM Tasks 
             WHERE UserId = ? AND CompletionDate IS NOT NULL
-          `, [userId]);
+          `, [user.UserId]);
                     const completedTasks = taskResults[0]?.completedTasks || 0;
-                    // קבלת הרמה הנוכחית של המשתמש
+                    // קבלת הרמה הנוכחית של המשתמש - משתמש ב-user.UserId
                     const [levelResults] = await pool.query(`
             SELECT TopicName, Level, EarnedScore 
             FROM UserInLevel 
             WHERE UserId = ? 
             ORDER BY CompletedAt DESC 
             LIMIT 1
-          `, [userId]);
+          `, [user.UserId]);
                     const currentLevel = levelResults[0];
                     // חישוב הרמה הבאה
                     const nextLevelNum = currentLevel ? currentLevel.Level + 1 : 2;
@@ -157,8 +160,8 @@ router.get('/data', async (req, res) => {
                         EnglishLevel: user.EnglishLevel,
                         FirstName: user.FirstName,
                         LastName: user.LastName,
-                        Email: user.Email, // ✅ כבר יש
-                        PhoneNumber: user.PhoneNumber, // ✅ הוסף
+                        Email: user.Email,
+                        PhoneNumber: user.PhoneNumber,
                         AgeRange: user.AgeRange,
                         completedTasksCount: completedTasks,
                         // נתוני רמה נוכחית
@@ -170,7 +173,11 @@ router.get('/data', async (req, res) => {
                         // סטטיסטיקות נוספות
                         activeSince: user.CreationDate ? new Date(user.CreationDate).toLocaleDateString() : new Date().toLocaleDateString()
                     };
-                    console.log('📤 Returning real user data:', responseData.UserId);
+                    console.log('📤 Returning real user data:', {
+                        userId: responseData.UserId,
+                        email: responseData.Email,
+                        name: `${responseData.FirstName} ${responseData.LastName}`
+                    });
                     return res.json(responseData);
                 }
             }
@@ -188,6 +195,9 @@ router.get('/data', async (req, res) => {
             EnglishLevel: 'Intermediate',
             FirstName: 'Test',
             LastName: 'User',
+            Email: 'test@example.com',
+            PhoneNumber: '123456789',
+            AgeRange: '25-34',
             completedTasksCount: 3,
             currentLevel: 'Intermediate Level 2',
             currentLevelPoints: 75,

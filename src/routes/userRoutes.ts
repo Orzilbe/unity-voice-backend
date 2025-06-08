@@ -3,6 +3,7 @@ import express, { Response, NextFunction } from 'express';
 import { authMiddleware } from '../middleware/authMiddleware';
 import DatabaseConnection from '../config/database';
 import { IUserRequest } from '../types/auth';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ router.get('/profile', authMiddleware, async (req: IUserRequest, res: Response) 
     
     // Fixed: Added Score field and using correct column name CreationDate
     const [users] = await pool.query(`
-SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName, Email, PhoneNumber, AgeRange
+      SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName, Email, PhoneNumber, AgeRange
       FROM Users 
       WHERE UserId = ?
     `, [req.user.id]);
@@ -115,9 +116,9 @@ router.get('/stats', authMiddleware, async (req: IUserRequest, res: Response) =>
   }
 });
 
-// 🔥 זה הEndpoint שמחליף authentication זמנית
+// ✅ Endpoint נכון עם authentication
 router.get('/data', async (req, res) => {
-  console.log('📝 User data endpoint called - bypassing auth temporarily');
+  console.log('📝 User data endpoint called');
   
   try {
     // אם יש Authorization header, ננסה לקבל את המשתמש האמיתי
@@ -128,38 +129,41 @@ router.get('/data', async (req, res) => {
       
       try {
         const pool = DatabaseConnection.getPool();
+        const token = authHeader.replace('Bearer ', '').trim();
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+        const userId = decoded.id || decoded.userId;
         
-        // נחפש משתמש לפי האימייל שבטוכן (או המשתמש הראשון)
+        console.log('🔍 Decoded user ID:', userId);
+        
         const [users] = await pool.query(`
           SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName, Email, PhoneNumber, AgeRange
           FROM Users 
           WHERE UserId = ? 
           LIMIT 1
-        `);
+        `, [userId]);
         
         if (users && (users as any[]).length > 0) {
           const user = (users as any[])[0];
-          const userId = user.UserId;
           
-          console.log('✅ Found real user:', userId);
+          console.log('✅ Found real user:', user.UserId);
           
-          // קבלת מספר המשימות שהושלמו
+          // קבלת מספר המשימות שהושלמו - משתמש ב-user.UserId
           const [taskResults] = await pool.query(`
             SELECT COUNT(*) as completedTasks 
             FROM Tasks 
             WHERE UserId = ? AND CompletionDate IS NOT NULL
-          `, [userId]);
+          `, [user.UserId]);
 
           const completedTasks = (taskResults as any[])[0]?.completedTasks || 0;
 
-          // קבלת הרמה הנוכחית של המשתמש
+          // קבלת הרמה הנוכחית של המשתמש - משתמש ב-user.UserId
           const [levelResults] = await pool.query(`
             SELECT TopicName, Level, EarnedScore 
             FROM UserInLevel 
             WHERE UserId = ? 
             ORDER BY CompletedAt DESC 
             LIMIT 1
-          `, [userId]);
+          `, [user.UserId]);
 
           const currentLevel = (levelResults as any[])[0];
 
@@ -181,9 +185,9 @@ router.get('/data', async (req, res) => {
             EnglishLevel: user.EnglishLevel,
             FirstName: user.FirstName,
             LastName: user.LastName,
-            Email: user.Email,               // ✅ כבר יש
-            PhoneNumber: user.PhoneNumber,   // ✅ הוסף
-            AgeRange: user.AgeRange,  
+            Email: user.Email,
+            PhoneNumber: user.PhoneNumber,
+            AgeRange: user.AgeRange,
             completedTasksCount: completedTasks,
             
             // נתוני רמה נוכחית
@@ -198,7 +202,11 @@ router.get('/data', async (req, res) => {
             activeSince: user.CreationDate ? new Date(user.CreationDate).toLocaleDateString() : new Date().toLocaleDateString()
           };
 
-          console.log('📤 Returning real user data:', responseData.UserId);
+          console.log('📤 Returning real user data:', {
+            userId: responseData.UserId,
+            email: responseData.Email,
+            name: `${responseData.FirstName} ${responseData.LastName}`
+          });
           return res.json(responseData);
         }
       } catch (dbError) {
@@ -216,6 +224,9 @@ router.get('/data', async (req, res) => {
       EnglishLevel: 'Intermediate',
       FirstName: 'Test',
       LastName: 'User',
+      Email: 'test@example.com',
+      PhoneNumber: '123456789',
+      AgeRange: '25-34',
       completedTasksCount: 3,
       currentLevel: 'Intermediate Level 2',
       currentLevelPoints: 75,
