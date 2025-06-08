@@ -16,8 +16,7 @@ router.get('/profile', authMiddleware_1.authMiddleware, async (req, res) => {
         const pool = database_1.default.getPool();
         // Fixed: Added Score field and using correct column name CreationDate
         const [users] = await pool.query(`
-      SELECT UserId, Email, FirstName, LastName, PhoneNumber, 
-             AgeRange, EnglishLevel, UserRole, CreationDate, LastLogin, Score
+SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName, Email, PhoneNumber, AgeRange
       FROM Users 
       WHERE UserId = ?
     `, [req.user.id]);
@@ -117,10 +116,10 @@ router.get('/data', async (req, res) => {
                 const pool = database_1.default.getPool();
                 // נחפש משתמש לפי האימייל שבטוכן (או המשתמש הראשון)
                 const [users] = await pool.query(`
-          SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName
+          SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName, Email, PhoneNumber, AgeRange
           FROM Users 
-      WHERE UserId = ? 
-                LIMIT 1
+          WHERE UserId = ? 
+          LIMIT 1
         `);
                 if (users && users.length > 0) {
                     const user = users[0];
@@ -158,6 +157,9 @@ router.get('/data', async (req, res) => {
                         EnglishLevel: user.EnglishLevel,
                         FirstName: user.FirstName,
                         LastName: user.LastName,
+                        Email: user.Email, // ✅ כבר יש
+                        PhoneNumber: user.PhoneNumber, // ✅ הוסף
+                        AgeRange: user.AgeRange,
                         completedTasksCount: completedTasks,
                         // נתוני רמה נוכחית
                         currentLevel: currentLevel ? `${currentLevel.TopicName} Level ${currentLevel.Level}` : user.EnglishLevel || 'Beginner',
