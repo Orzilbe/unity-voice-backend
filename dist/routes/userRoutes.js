@@ -119,8 +119,8 @@ router.get('/data', async (req, res) => {
                 const [users] = await pool.query(`
           SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName
           FROM Users 
-          WHERE Email = 'orzilbe@gmail.com'
-          LIMIT 1
+      WHERE UserId = ? 
+                LIMIT 1
         `);
                 if (users && users.length > 0) {
                     const user = users[0];
