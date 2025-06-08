@@ -135,7 +135,7 @@ app.get('/api/user/data', async (req, res) => {
         const [users] = await pool.query(`
           SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName
           FROM Users 
-          WHERE Email = 'orzilbe@gmail.com'
+          WHERE UserId = ? 
           LIMIT 1
         `);
         

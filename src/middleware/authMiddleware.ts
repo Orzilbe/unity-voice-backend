@@ -5,6 +5,7 @@ import { AppError } from './errorHandler';
 import { TokenPayload, IUserRequest } from '../types/auth';
 
 export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunction) => {
+
   let token: string | undefined;
   
   // ✅ 1. נסה לקרוא מ-Authorization header קודם (לproduction)
