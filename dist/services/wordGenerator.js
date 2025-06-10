@@ -1,5 +1,5 @@
 "use strict";
-// /backend/src/services/wordGenerator.ts
+// /backend/src/services/wordGenerator.ts - FIXED VERSION
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateWords = generateWords;
 const openai_1 = require("openai");
@@ -8,37 +8,47 @@ const uuid_1 = require("uuid");
 console.log('AZURE_OPENAI_ENDPOINT config:', process.env.AZURE_OPENAI_ENDPOINT ? 'Set (value hidden)' : 'Not set');
 console.log('AZURE_OPENAI_API_KEY config:', process.env.AZURE_OPENAI_API_KEY ? 'Set (value hidden)' : 'Not set');
 console.log('AZURE_OPENAI_DEPLOYMENT_NAME config:', process.env.AZURE_OPENAI_DEPLOYMENT_NAME);
-// Create Azure OpenAI client
+// Create Azure OpenAI client - FIXED CONFIGURATION
 const endpoint = process.env.AZURE_OPENAI_ENDPOINT || '';
 const apiKey = process.env.AZURE_OPENAI_API_KEY || '';
 const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4o';
-const apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2024-04-01-preview';
+const apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2024-02-01'; // ✅ Changed to stable version
+// ✅ CORRECT CLIENT CONFIGURATION
 const client = new openai_1.AzureOpenAI({
     endpoint,
     apiKey,
-    deployment,
     apiVersion
+    // ❌ DON'T include deployment here - it goes in the model parameter
 });
 async function generateWords(englishLevel, topicName, existingWords = []) {
-    console.log(`Generating words for topic: ${topicName}, level: ${englishLevel}`);
+    console.log(`🎯 Generating words for level: ${englishLevel}`);
+    // ✅ Check required environment variables
+    if (!endpoint || !apiKey || !deployment) {
+        console.error('❌ Missing required Azure OpenAI environment variables:');
+        console.error('- AZURE_OPENAI_ENDPOINT:', endpoint ? '✅' : '❌');
+        console.error('- AZURE_OPENAI_API_KEY:', apiKey ? '✅' : '❌');
+        console.error('- AZURE_OPENAI_DEPLOYMENT_NAME:', deployment ? '✅' : '❌');
+        return [];
+    }
     const prompt = createPromptForTopic(topicName, englishLevel, existingWords);
     try {
-        console.log('Making Azure OpenAI API request:');
+        console.log('🚀 Making Azure OpenAI API request...');
         console.log('- Endpoint:', endpoint);
         console.log('- Deployment:', deployment);
-        // Send request to Azure OpenAI using the new format
+        console.log('- API Version:', apiVersion);
+        // ✅ CORRECT API CALL
         const completion = await client.chat.completions.create({
+            model: deployment, // ✅ Use deployment name here, not in client config
             messages: [
                 { role: "system", content: "You are a precise language learning assistant creating vocabulary words." },
                 { role: "user", content: prompt }
             ],
-            model: deployment, // השתמש ב-deployment name
             temperature: 0.7,
             max_tokens: 1000
         });
         // Process the response
         const responseText = completion.choices[0].message?.content?.trim() || '';
-        console.log('Azure OpenAI API response received successfully');
+        console.log('✅ Azure OpenAI API response received successfully');
         // Parse the JSON response
         let wordsData;
         try {
@@ -47,7 +57,7 @@ async function generateWords(englishLevel, topicName, existingWords = []) {
             wordsData = JSON.parse(jsonString);
         }
         catch (error) {
-            console.error('Error parsing OpenAI response:', error);
+            console.error('❌ Error parsing OpenAI response:', error);
             console.error('Raw response text:', responseText);
             return [];
         }
@@ -60,13 +70,25 @@ async function generateWords(englishLevel, topicName, existingWords = []) {
             TopicName: topicName,
             EnglishLevel: englishLevel
         }));
-        console.log(`Successfully generated ${generatedWords.length} words`);
+        console.log(`✅ Successfully generated ${generatedWords.length} words`);
         return generatedWords;
     }
     catch (error) {
-        console.error('==== Error generating words with Azure OpenAI ====');
-        console.error('Error:', error);
-        console.error('============================================');
+        console.error('❌ Error generating words with Azure OpenAI:', error);
+        // Detailed error logging
+        if (error.status === 401) {
+            console.error('🔑 Authentication Error: Invalid API key or endpoint');
+            console.error('- Check your AZURE_OPENAI_API_KEY');
+            console.error('- Verify AZURE_OPENAI_ENDPOINT format: https://yourresource.openai.azure.com/');
+        }
+        else if (error.status === 404) {
+            console.error('🎯 Not Found Error: Invalid deployment or endpoint');
+            console.error('- Check your AZURE_OPENAI_DEPLOYMENT_NAME matches Azure portal');
+            console.error('- Verify endpoint URL is correct');
+        }
+        else if (error.status === 429) {
+            console.error('⏱️ Rate Limit: Too many requests');
+        }
         return [];
     }
 }
