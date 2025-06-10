@@ -1,5 +1,5 @@
-//backend/src/routes/taskRoutes.ts
-import express, { Response } from 'express'; // ← הוסף Response לייבוא
+//backend/src/routes/taskRoutes.ts - COMPLETE FIXED VERSION
+import express, { Response } from 'express';
 import { IUserRequest } from '../types/auth';
 import { Pool } from 'mysql2/promise';
 import pool from '../models/db';
@@ -15,16 +15,21 @@ import { getDbPool } from '../lib/db';
 const router = express.Router();
 
 /**
- * יצירת משימה חדשה
+ * יצירת משימה חדשה - גרסה מתוקנת
  * POST /api/tasks
  */
-router.post('/', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
+router.post('/', authMiddleware, async (req: IUserRequest, res: Response) => {
+  let connection: any = null;
+  
   try {
-    console.log('Creating new task with data:', req.body);
+    console.log('🚀 Creating new task with data:', req.body);
+    console.log('👤 Authenticated user:', req.user);
+    
     const { UserId, TopicName, Level, TaskType, TaskScore = 0, StartDate } = req.body;
     
-    // בדיקת הפרמטרים הנדרשים
+    // ✅ בדיקת הפרמטרים הנדרשים
     if (!UserId || !TopicName || !Level || !TaskType) {
+      console.log('❌ Missing required fields');
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: UserId, TopicName, Level, TaskType',
@@ -37,49 +42,115 @@ router.post('/', authMiddleware, async (req: IUserRequest, res: Response) => { /
       });
     }
     
-    // ודא שהמשתמש שמוטמע בטוכן תואם לשדה UserId
-    if (req.user?.id && req.user.id.toString() !== UserId) {
-      console.warn(`User ID mismatch: ${req.user.id} vs ${UserId}`);
+    // ✅ תיקון: ולידציה שהמשתמש בtoken תואם למשתמש בבקשה
+    const authenticatedUserId = req.user?.id || req.user?.userId;
+    
+    if (!authenticatedUserId) {
+      console.log('❌ No user ID found in token');
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated - no user ID in token'
+      });
+    }
+
+    // המרה לstring לצורך השוואה עם הDB
+    const tokenUserId = authenticatedUserId.toString();
+
+    // השוואה עם UserId מהבקשה (שמגיע מהfrontend)
+    if (tokenUserId !== UserId.toString()) {
+      console.log(`❌ User ID mismatch: token=${tokenUserId}, request=${UserId}`);
       return res.status(403).json({
         success: false,
         error: 'UserId in request does not match authenticated user'
       });
     }
     
-    // קבלת חיבור למסד הנתונים
-    const connection = await pool.getConnection();
+    console.log(`✅ User ID validated: ${UserId}`);
     
-    // בדיקה אם הנושא והרמה קיימים
+    // ✅ השתמש ב-UserId מהבקשה (שכבר אומת)
+    const finalUserId = UserId.toString();
+    
+    // קבלת חיבור למסד הנתונים
+    const dbPool = await getDbPool();
+    if (!dbPool) {
+      console.error('❌ Database pool not available');
+      return res.status(500).json({
+        success: false,
+        error: 'Database connection not available'
+      });
+    }
+    
+    connection = await dbPool.getConnection();
+    console.log('✅ Database connection established');
+    
+    // בדיקה שהנושא והרמה קיימים
+    console.log(`🔍 Checking if topic "${TopicName}" with level ${Level} exists`);
     const [levelExists] = await connection.execute(
       'SELECT 1 FROM Levels WHERE TopicName = ? AND Level = ?',
       [TopicName, Level]
     );
     
     if (!Array.isArray(levelExists) || levelExists.length === 0) {
+      console.log(`❌ Topic "${TopicName}" with level ${Level} not found`);
       return res.status(404).json({
         success: false,
         error: `Topic '${TopicName}' with level ${Level} not found`
       });
     }
     
-    // בדיקה אם המשתמש קיים
+    console.log('✅ Topic and level validated');
+    
+    // בדיקה שהמשתמש קיים
+    console.log(`🔍 Checking if user ${finalUserId} exists`);
     const [userExists] = await connection.execute(
       'SELECT 1 FROM Users WHERE UserId = ?',
-      [UserId]
+      [finalUserId]
     );
     
     if (!Array.isArray(userExists) || userExists.length === 0) {
+      console.log(`❌ User ${finalUserId} not found in database`);
       return res.status(404).json({
         success: false,
-        error: `User with ID ${UserId} not found`
+        error: `User with ID ${finalUserId} not found`
       });
     }
     
-    // יצירת מזהה למשימה
-    const TaskId = uuidv4();
-    console.log('Generated new TaskId:', TaskId);
+    console.log('✅ User validated');
     
-    // SQL לצורך הכנסת המשימה
+    // בדיקה אם כבר קיימת משימה פתוחה מאותו סוג
+    console.log(`🔍 Checking for existing incomplete ${TaskType} task`);
+    const [existingTasks] = await connection.execute(
+      `SELECT TaskId FROM Tasks 
+       WHERE UserId = ? AND TopicName = ? AND Level = ? AND TaskType = ? 
+       AND CompletionDate IS NULL`,
+      [finalUserId, TopicName, Level, TaskType]
+    );
+    
+    if (Array.isArray(existingTasks) && existingTasks.length > 0) {
+      const existingTaskId = (existingTasks[0] as any).TaskId;
+      console.log(`✅ Found existing incomplete task: ${existingTaskId}`);
+      
+      return res.status(200).json({
+        success: true,
+        TaskId: existingTaskId,
+        UserId: finalUserId,
+        TopicName: TopicName,
+        Level: Level,
+        TaskType: TaskType,
+        TaskScore: TaskScore,
+        StartDate: StartDate || null,
+        message: 'Using existing incomplete task'
+      });
+    }
+    
+    // יצירת משימה חדשה
+    const TaskId = uuidv4();
+    console.log(`🆕 Creating new task with ID: ${TaskId}`);
+    
+    // SQL מפושט עם טיפול בתאריכים
+    const currentTimestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const taskStartDate = StartDate || currentTimestamp;
+    
     const insertSql = `
       INSERT INTO Tasks (
         TaskId, 
@@ -87,51 +158,83 @@ router.post('/', authMiddleware, async (req: IUserRequest, res: Response) => { /
         TopicName, 
         Level, 
         TaskType, 
-        TaskScore
-        ${StartDate ? ', StartDate' : ''}
-      ) VALUES (?, ?, ?, ?, ?, ?${StartDate ? ', ?' : ''})
+        TaskScore,
+        StartDate
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     
-    // הפרמטרים להכנסה
     const insertParams = [
       TaskId,
-      UserId,
+      finalUserId,
       TopicName,
       Level,
       TaskType,
       TaskScore,
+      taskStartDate
     ];
     
-    // הוספת StartDate אם קיים
-    if (StartDate) {
-      insertParams.push(StartDate);
-    }
-    
-    // ביצוע השאילתה
-    console.log('Executing SQL:', insertSql);
-    console.log('With parameters:', insertParams);
+    console.log('📝 Executing SQL:', insertSql);
+    console.log('📋 With parameters:', insertParams);
     
     const [result] = await connection.execute(insertSql, insertParams);
     
-    console.log('Task created successfully:', result);
+    console.log('✅ Task created successfully:', result);
     
-    // החזרת תוצאה מוצלחת
+    // תגובה מוצלחת
     return res.status(201).json({
       success: true,
       TaskId: TaskId,
-      UserId: UserId,
+      UserId: finalUserId,
       TopicName: TopicName,
       Level: Level,
       TaskType: TaskType,
       TaskScore: TaskScore,
-      StartDate: StartDate || null
+      StartDate: taskStartDate,
+      message: 'Task created successfully'
     });
+    
   } catch (error) {
-    console.error('Error creating task:', error);
-    return res.status(500).json({
+    console.error('💥 Error creating task:', error);
+    
+    let errorMessage = 'Unknown error occurred';
+    let statusCode = 500;
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 500)
+      });
+      
+      // בדיקת סוגי שגיאות ספציפיים
+      if (error.message.includes('ECONNREFUSED')) {
+        errorMessage = 'Database connection failed';
+      } else if (error.message.includes('ER_NO_SUCH_TABLE')) {
+        errorMessage = 'Database table not found';
+      } else if (error.message.includes('ER_DUP_ENTRY')) {
+        errorMessage = 'Duplicate entry detected';
+      }
+    }
+    
+    return res.status(statusCode).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: errorMessage,
+      timestamp: new Date().toISOString(),
+      ...(process.env.NODE_ENV === 'development' && {
+        details: error instanceof Error ? error.stack : String(error)
+      })
     });
+    
+  } finally {
+    if (connection) {
+      try {
+        connection.release();
+        console.log('🔌 Database connection released');
+      } catch (releaseError) {
+        console.error('❌ Error releasing database connection:', releaseError);
+      }
+    }
   }
 });
 
@@ -139,16 +242,34 @@ router.post('/', authMiddleware, async (req: IUserRequest, res: Response) => { /
  * עדכון משימה קיימת
  * PATCH /api/tasks/:taskId
  */
-router.patch('/:taskId', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
+router.patch('/:taskId', authMiddleware, async (req: IUserRequest, res: Response) => {
+  let connection: any = null;
+  
   try {
-    console.log(`Updating task ${req.params.taskId} with data:`, req.body);
+    console.log(`🔄 Updating task ${req.params.taskId} with data:`, req.body);
     const { taskId } = req.params;
     const { TaskScore, DurationTask, CompletionDate } = req.body;
     
-    // קבלת חיבור למסד הנתונים
-    const connection = await pool.getConnection();
+    const authenticatedUserId = req.user?.id || req.user?.userId;
     
-    // בדיקה שהמשימה קיימת
+    if (!authenticatedUserId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+    
+    const dbPool = await getDbPool();
+    if (!dbPool) {
+      return res.status(500).json({
+        success: false,
+        error: 'Database connection not available'
+      });
+    }
+    
+    connection = await dbPool.getConnection();
+    
+    // בדיקה שהמשימה קיימת ושייכת למשתמש
     const [tasks] = await connection.execute(
       'SELECT UserId FROM Tasks WHERE TaskId = ?',
       [taskId]
@@ -161,9 +282,8 @@ router.patch('/:taskId', authMiddleware, async (req: IUserRequest, res: Response
       });
     }
     
-    // בדיקה שהמשתמש מורשה לעדכן את המשימה הזו
     const task = tasks[0] as any;
-    if (req.user?.id && req.user.id.toString() !== task.UserId) {
+    if (task.UserId !== authenticatedUserId.toString()) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to update this task'
@@ -186,7 +306,6 @@ router.patch('/:taskId', authMiddleware, async (req: IUserRequest, res: Response
     
     if (CompletionDate !== undefined) {
       updateSql += 'CompletionDate = ?, ';
-      // 🔧 המר ISO string ל-MySQL format  
       const mysqlDate = new Date(CompletionDate).toISOString().slice(0, 19).replace('T', ' ');
       updateParams.push(mysqlDate);
       console.log(`🔄 Converting date from ${CompletionDate} to ${mysqlDate}`);
@@ -199,7 +318,6 @@ router.patch('/:taskId', authMiddleware, async (req: IUserRequest, res: Response
     updateSql += ' WHERE TaskId = ?';
     updateParams.push(taskId);
     
-    // אם אין שדות לעדכון, החזר שגיאה
     if (updateParams.length === 1) {
       return res.status(400).json({
         success: false,
@@ -207,13 +325,11 @@ router.patch('/:taskId', authMiddleware, async (req: IUserRequest, res: Response
       });
     }
     
-    // ביצוע העדכון
-    console.log('Executing SQL:', updateSql);
-    console.log('With parameters:', updateParams);
+    console.log('📝 Executing update SQL:', updateSql);
+    console.log('📋 With parameters:', updateParams);
     
     const [result] = await connection.execute(updateSql, updateParams);
     
-    // בדיקה שהעדכון הצליח
     if ((result as any).affectedRows === 0) {
       return res.status(400).json({
         success: false,
@@ -221,39 +337,46 @@ router.patch('/:taskId', authMiddleware, async (req: IUserRequest, res: Response
       });
     }
     
-    console.log('Task updated successfully:', result);
+    console.log('✅ Task updated successfully');
     
-    // החזרת תוצאה מוצלחת
     return res.json({
       success: true,
       message: 'Task updated successfully',
       taskId: taskId
     });
+    
   } catch (error) {
-    console.error('Error updating task:', error);
+    console.error('💥 Error updating task:', error);
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 
 /**
  * PUT /api/tasks/:taskId/complete - Complete a task and record word usage
  */
-router.put('/:taskId/complete', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
+router.put('/:taskId/complete', authMiddleware, async (req: IUserRequest, res: Response) => {
   let dbConnection;
   try {
-    dbConnection = await pool.getConnection();
+    const dbPool = await getDbPool();
+    dbConnection = await dbPool.getConnection();
     await dbConnection.beginTransaction();
     
     const { taskId } = req.params;
     const { wordIds, TaskScore = 100, DurationTask = 0 } = req.body;
     
+    const authenticatedUserId = req.user?.id || req.user?.userId;
+    
     // Verify task exists and belongs to user
     const [tasks] = await dbConnection.execute(
       'SELECT * FROM Tasks WHERE TaskId = ? AND UserId = ?',
-      [taskId, req.user?.id]
+      [taskId, authenticatedUserId]
     );
     
     if (!Array.isArray(tasks) || tasks.length === 0) {
@@ -308,14 +431,17 @@ router.put('/:taskId/complete', authMiddleware, async (req: IUserRequest, res: R
 /**
  * POST /api/tasks/:taskId/words - Record word usage in a task
  */
-router.post('/:taskId/words', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
+router.post('/:taskId/words', authMiddleware, async (req: IUserRequest, res: Response) => {
   let dbConnection;
   try {
-    dbConnection = await pool.getConnection();
+    const dbPool = await getDbPool();
+    dbConnection = await dbPool.getConnection();
     await dbConnection.beginTransaction();
     
     const { taskId } = req.params;
     const { wordIds } = req.body;
+    
+    const authenticatedUserId = req.user?.id || req.user?.userId;
     
     if (!Array.isArray(wordIds) || wordIds.length === 0) {
       return res.status(400).json({
@@ -327,7 +453,7 @@ router.post('/:taskId/words', authMiddleware, async (req: IUserRequest, res: Res
     // Verify task exists and belongs to user
     const [tasks] = await dbConnection.execute(
       'SELECT * FROM Tasks WHERE TaskId = ? AND UserId = ?',
-      [taskId, req.user?.id]
+      [taskId, authenticatedUserId]
     );
     
     if (!Array.isArray(tasks) || tasks.length === 0) {
@@ -370,20 +496,23 @@ router.post('/:taskId/words', authMiddleware, async (req: IUserRequest, res: Res
  * קבלת משימות לפי משתמש
  * GET /api/tasks/user/:userId
  */
-router.get('/user/:userId', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
+router.get('/user/:userId', authMiddleware, async (req: IUserRequest, res: Response) => {
+  let connection: any = null;
+  
   try {
     const { userId } = req.params;
+    const authenticatedUserId = req.user?.id || req.user?.userId;
     
     // בדיקה שהמשתמש מורשה לראות את המשימות האלו
-    if (req.user?.id && req.user.id.toString() !== userId) {
+    if (authenticatedUserId && authenticatedUserId.toString() !== userId) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to view these tasks'
       });
     }
     
-    // קבלת חיבור למסד הנתונים
-    const connection = await pool.getConnection();
+    const dbPool = await getDbPool();
+    connection = await dbPool.getConnection();
     
     // קבלת המשימות
     const [tasks] = await connection.execute(
@@ -405,6 +534,10 @@ router.get('/user/:userId', authMiddleware, async (req: IUserRequest, res: Respo
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 
@@ -412,58 +545,65 @@ router.get('/user/:userId', authMiddleware, async (req: IUserRequest, res: Respo
  * קבלת משימות של המשתמש הנוכחי
  * GET /api/tasks
  */
-router.get('/', authMiddleware, async (req: IUserRequest, res: Response) => { // ← שינוי כאן
+router.get('/', authMiddleware, async (req: IUserRequest, res: Response) => {
+  let connection: any = null;
+  
   try {
     console.log('GET /api/tasks - Fetching current user tasks');
     
-    const userId = req.user?.id;
+    const authenticatedUserId = req.user?.id || req.user?.userId;
     
-    if (!userId) {
+    if (!authenticatedUserId) {
       return res.status(401).json({ error: 'User ID not found in token' });
     }
     
     // קבלת פרמטרים מה-URL
     const { topicName } = req.query;
     
-    const connection = await pool.getConnection();
-    try {
-      let query = `SELECT * FROM Tasks WHERE UserId = ?`;
-      const params: any[] = [userId];
-      
-      // סינון לפי נושא אם נדרש
-      if (topicName) {
-        query += ` AND (TopicName = ? OR LOWER(TopicName) = LOWER(?))`;
-        params.push(topicName, topicName);
-      }
-      
-      query += ` ORDER BY 
-        CASE WHEN CompletionDate IS NULL THEN 0 ELSE 1 END, 
-        StartDate DESC`;
-      
-      const [tasks] = await connection.query(query, params);
-      
-      console.log(`Retrieved ${(tasks as any[]).length} tasks for user ${userId}`);
-      res.json(tasks);
-    } finally {
-      connection.release();
+    const dbPool = await getDbPool();
+    connection = await dbPool.getConnection();
+    
+    let query = `SELECT * FROM Tasks WHERE UserId = ?`;
+    const params: any[] = [authenticatedUserId];
+    
+    // סינון לפי נושא אם נדרש
+    if (topicName) {
+      query += ` AND (TopicName = ? OR LOWER(TopicName) = LOWER(?))`;
+      params.push(topicName, topicName);
     }
+    
+    query += ` ORDER BY 
+      CASE WHEN CompletionDate IS NULL THEN 0 ELSE 1 END, 
+      StartDate DESC`;
+    
+    const [tasks] = await connection.query(query, params);
+    
+    console.log(`Retrieved ${(tasks as any[]).length} tasks for user ${authenticatedUserId}`);
+    res.json(tasks);
   } catch (error) {
     console.error('Error fetching user tasks:', error);
     res.status(500).json({ error: 'Failed to fetch user tasks' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
+
 /**
  * מחפש את משימת הכרטיסיות האחרונה שהושלמה לנושא ורמה מסוימים
  * GET /api/tasks/completed-flashcard?topicName=xxx&level=xxx&userId=xxx
  */
 router.get('/completed-flashcard', authMiddleware, async (req: IUserRequest, res) => {
+  let connection: any = null;
+  
   console.log('🔍 GET /api/tasks/completed-flashcard - Finding completed flashcard task');
   
   try {
     const { topicName, level, userId: queryUserId } = req.query;
-    const userId = req.user?.id || queryUserId;
+    const authenticatedUserId = req.user?.id || req.user?.userId || queryUserId;
 
-    if (!topicName || !level || !userId) {
+    if (!topicName || !level || !authenticatedUserId) {
       return res.status(400).json({ 
         success: false, 
         error: 'topicName, level, and userId are required' 
@@ -473,92 +613,87 @@ router.get('/completed-flashcard', authMiddleware, async (req: IUserRequest, res
     console.log(`📋 Looking for completed flashcard task:`, {
       topicName,
       level,
-      userId
+      userId: authenticatedUserId
     });
 
-    const pool = await getDbPool();
-    if (!pool) {
+    const dbPool = await getDbPool();
+    if (!dbPool) {
       return res.status(500).json({ 
         success: false, 
         error: 'Database connection failed' 
       });
     }
 
-    const connection = await pool.getConnection();
-    try {
-      // חפש את משימת הכרטיסיות האחרונה שהושלמה לנושא ורמה הנתונים
-      const [taskRows] = await connection.query(`
-SELECT TaskId, TopicName, Level, CompletionDate, TaskScore
-FROM Tasks 
-WHERE UserId = ? 
-  AND TopicName = ? 
-  AND Level = ? 
-  AND TaskType = 'flashcard' 
-  AND CompletionDate IS NOT NULL
+    connection = await dbPool.getConnection();
+    
+    // חפש את משימת הכרטיסיות האחרונה שהושלמה לנושא ורמה הנתונים
+    const [taskRows] = await connection.query(`
+      SELECT TaskId, TopicName, Level, CompletionDate, TaskScore
+      FROM Tasks 
+      WHERE UserId = ? 
+        AND TopicName = ? 
+        AND Level = ? 
+        AND TaskType = 'flashcard' 
+        AND CompletionDate IS NOT NULL
+      ORDER BY CompletionDate DESC
+      LIMIT 1
+    `, [authenticatedUserId, topicName, level]);
 
-        ORDER BY CompletionDate DESC
-        LIMIT 1
-      `, [userId, topicName, level]);
-
-      if (!Array.isArray(taskRows) || taskRows.length === 0) {
-        console.log(`❌ No completed flashcard task found for topic: ${topicName}, level: ${level}, user: ${userId}`);
-        return res.status(404).json({ 
-          success: false, 
-          error: 'No completed flashcard task found for this topic and level',
-          debug: {
-            topicName,
-            level,
-            userId,
-            searchCriteria: 'flashcard task with CompletionDate IS NOT NULL'
-          }
-        });
-      }
-
-      const task = taskRows[0] as any;
-      console.log(`✅ Found completed flashcard task:`, {
-        taskId: task.TaskId,
-        topicName: task.TopicName,
-        level: task.Level,
-        completionDate: task.CompletionDate,
-        score: task.TaskScore
+    if (!Array.isArray(taskRows) || taskRows.length === 0) {
+      console.log(`❌ No completed flashcard task found for topic: ${topicName}, level: ${level}, user: ${authenticatedUserId}`);
+      return res.status(404).json({ 
+        success: false, 
+        error: 'No completed flashcard task found for this topic and level',
+        debug: {
+          topicName,
+          level,
+          userId: authenticatedUserId,
+          searchCriteria: 'flashcard task with CompletionDate IS NOT NULL'
+        }
       });
-
-      // בדוק שיש מילים במשימה זו
-      const [wordRows] = await connection.query(`
-        SELECT COUNT(*) as wordCount
-        FROM wordintask wit
-        WHERE wit.TaskId = ?
-      `, [task.TaskId]);
-
-      const wordCount = (wordRows as any[])[0]?.wordCount || 0;
-      console.log(`📝 Task ${task.TaskId} has ${wordCount} words`);
-
-      if (wordCount === 0) {
-        console.log(`⚠️ Task ${task.TaskId} has no words associated with it`);
-        return res.status(404).json({ 
-          success: false, 
-          error: 'Found completed flashcard task but it has no words associated',
-          debug: {
-            taskId: task.TaskId,
-            wordCount: 0
-          }
-        });
-      }
-
-      return res.status(200).json({ 
-        success: true, 
-        taskId: task.TaskId,
-        topicName: task.TopicName,
-        level: task.Level,
-        completionDate: task.CompletionDate,
-        score: task.TaskScore,
-        wordCount: wordCount,
-        message: `Found completed flashcard task with ${wordCount} words`
-      });
-
-    } finally {
-      connection.release();
     }
+
+    const task = taskRows[0] as any;
+    console.log(`✅ Found completed flashcard task:`, {
+      taskId: task.TaskId,
+      topicName: task.TopicName,
+      level: task.Level,
+      completionDate: task.CompletionDate,
+      score: task.TaskScore
+    });
+
+    // בדוק שיש מילים במשימה זו
+    const [wordRows] = await connection.query(`
+      SELECT COUNT(*) as wordCount
+      FROM wordintask wit
+      WHERE wit.TaskId = ?
+    `, [task.TaskId]);
+
+    const wordCount = (wordRows as any[])[0]?.wordCount || 0;
+    console.log(`📝 Task ${task.TaskId} has ${wordCount} words`);
+
+    if (wordCount === 0) {
+      console.log(`⚠️ Task ${task.TaskId} has no words associated with it`);
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Found completed flashcard task but it has no words associated',
+        debug: {
+          taskId: task.TaskId,
+          wordCount: 0
+        }
+      });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      taskId: task.TaskId,
+      topicName: task.TopicName,
+      level: task.Level,
+      completionDate: task.CompletionDate,
+      score: task.TaskScore,
+      wordCount: wordCount,
+      message: `Found completed flashcard task with ${wordCount} words`
+    });
 
   } catch (error) {
     console.error('💥 Error finding completed flashcard task:', error);
@@ -569,6 +704,11 @@ WHERE UserId = ?
       details: process.env.NODE_ENV === 'development' ? 
         (error instanceof Error ? error.message : 'Unknown error') : undefined
     });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
+
 export default router;
