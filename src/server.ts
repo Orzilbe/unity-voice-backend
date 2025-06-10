@@ -2,7 +2,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import cookieParser from 'cookie-parser'; // ✅ הוספה חדשה
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './models';
 import DatabaseConnection from './config/database';
@@ -25,7 +25,7 @@ import dashboardRoutes from './routes/dashboardRoutes';
 import quizRoutes from './routes/quizRoutes';
 import conversationAnalysisRoutes from './routes/conversationAnalysisRoutes';
 
-// ✅ נסה לטעון את wordsToTaskRoutes - עם טיפול בשגיאות
+// Load wordsToTaskRoutes with error handling
 let wordsToTaskRoutes: any = null;
 try {
   wordsToTaskRoutes = require('./routes/wordsToTaskRoutes').default;
@@ -47,19 +47,22 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ Middleware - סדר חשוב!
+// Middleware
 app.use(helmet()); // Adds security headers
 
-// ✅ CORS עודכן לתמיכה בcookies
+// CORS configuration with credentials support
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000', // כתובת הfrontend
-  credentials: true, // ✅ חיוני לcookies!
+  origin: [
+    'http://localhost:3000',
+    'http://192.168.0.96:3000'
+  ],
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Set-Cookie'] // ✅ חשוב לcookies
+  exposedHeaders: ['Set-Cookie']
 }));
 
-// ✅ Cookie parser - חייב להיות לפני הroutes!
+// Cookie parser - must be before routes
 app.use(cookieParser());
 
 app.use(express.json());
@@ -71,7 +74,7 @@ app.get('/', (req: Request, res: Response) => {
     message: "Unity Voice API is running", 
     status: "ok",
     timestamp: new Date().toISOString(),
-    cookieSupport: "enabled" // ✅ אינדיקטור שcookies מופעלים
+    cookieSupport: "enabled"
   });
 });
 
@@ -117,111 +120,7 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
-// 🔥 ROUTES זמניים ללא authentication - לפני כל שאר הroutes!
-// 🔥 ROUTE זמני לuser data ללא authentication
-app.get('/api/user/data', async (req, res) => {
-  console.log('🚀 TEMP /api/user/data called - no auth required');
-  
-  try {
-    // אם יש Authorization header, ננסה לקבל את המשתמש האמיתי
-    const authHeader = req.headers.authorization;
-    console.log('🔍 Auth header:', authHeader ? 'Present' : 'Missing');
-    
-    if (authHeader) {
-      try {
-        const pool = DatabaseConnection.getPool();
-        
-        // נחפש משתמש לפי האימייל שבטוכן (או המשתמש הראשון)
-        const [users] = await pool.query(`
-          SELECT UserId, Score, CreationDate, EnglishLevel, FirstName, LastName
-          FROM Users 
-          WHERE UserId = ? 
-          LIMIT 1
-        `);
-        
-        if (users && (users as any[]).length > 0) {
-          const user = (users as any[])[0];
-          const userId = user.UserId;
-          
-          console.log('✅ Found real user:', userId);
-          
-          // קבלת מספר המשימות שהושלמו
-          const [taskResults] = await pool.query(`
-            SELECT COUNT(*) as completedTasks 
-            FROM Tasks 
-            WHERE UserId = ? AND CompletionDate IS NOT NULL
-          `, [userId]);
-
-          const completedTasks = (taskResults as any[])[0]?.completedTasks || 0;
-
-          const responseData = {
-            UserId: user.UserId,
-            Score: user.Score || 0,
-            totalScore: user.Score || 0,
-            CreationDate: user.CreationDate,
-            EnglishLevel: user.EnglishLevel,
-            FirstName: user.FirstName,
-            LastName: user.LastName,
-            completedTasksCount: completedTasks,
-            currentLevel: user.EnglishLevel || 'Beginner',
-            currentLevelPoints: 75,
-            nextLevel: 'Advanced',
-            pointsToNextLevel: 25,
-            activeSince: user.CreationDate ? new Date(user.CreationDate).toLocaleDateString() : new Date().toLocaleDateString()
-          };
-
-          console.log('📤 Returning real user data from temp route');
-          return res.json(responseData);
-        }
-      } catch (dbError) {
-        console.error('❌ Database error, falling back to mock data:', dbError);
-      }
-    }
-    
-    // נתונים פיקטיביים כפתרון זמני
-    console.log('📤 Returning mock user data from temp route');
-    res.json({
-      UserId: 'usr_mas51g95_c0ab879a',
-      Score: 100,
-      totalScore: 100,
-      CreationDate: new Date(),
-      EnglishLevel: 'Intermediate',
-      FirstName: 'Test',
-      LastName: 'User',
-      completedTasksCount: 3,
-      currentLevel: 'Intermediate Level 2',
-      currentLevelPoints: 75,
-      nextLevel: 'Advanced Level 1',
-      pointsToNextLevel: 25,
-      activeSince: new Date().toLocaleDateString()
-    });
-    
-  } catch (error) {
-    console.error('Error in temp user data endpoint:', error);
-    res.status(500).json({ 
-      error: 'Server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// 🔥 ROUTE זמני לtopics ללא authentication  
-app.get('/api/topics', async (req, res) => {
-  console.log('🚀 TEMP /api/topics called - no auth required');
-  
-  try {
-    const pool = DatabaseConnection.getPool();
-    const [rows] = await pool.query('SELECT * FROM Topics ORDER BY TopicName');
-    
-    console.log(`✅ Found ${(rows as any[]).length} topics from temp route`);
-    res.json(rows);
-  } catch (error) {
-    console.error('Error getting topics from temp route:', error);
-    res.status(500).json({ error: 'Failed to get topics' });
-  }
-});
-
-// ✅ Debug route עם מידע על cookies
+// Debug route for authentication
 app.get('/api/debug/auth', (req: Request, res: Response) => {
   res.json({
     message: 'Auth Debug Information',
@@ -238,19 +137,19 @@ app.get('/api/debug/auth', (req: Request, res: Response) => {
   });
 });
 
-// Debug route - הוסף לפני כל ה-routes כדי שיעבוד
+// Debug route for all routes
 app.get('/api/debug/routes', (req: Request, res: Response) => {
   const routes: string[] = [];
   
-  // איסוף כל ה-routes הרשומים
+  // Collect all registered routes
   function extractRoutes(stack: any[], prefix = '') {
     stack.forEach((layer: any) => {
       if (layer.route) {
-        // Route ישיר
+        // Direct route
         const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
         routes.push(`${methods} ${prefix}${layer.route.path}`);
       } else if (layer.name === 'router' && layer.handle.stack) {
-        // Router נוסף
+        // Router
         const routerPrefix = layer.regexp.source
           .replace('^\\\/', '')
           .replace('\\/?(?=\\\\/|$)', '')
@@ -283,7 +182,7 @@ app.get('/api/debug/routes', (req: Request, res: Response) => {
   });
 });
 
-// ✅ Debug route ישיר לבדיקת cookies - הוסיפי את זה אחרי app.use(cookieParser());
+// Direct cookie debug route
 app.get('/api/auth/debug/cookies', (req: Request, res: Response) => {
   console.log('🔍 Direct debug cookies requested from server.ts');
   res.json({
@@ -300,7 +199,7 @@ app.get('/api/auth/debug/cookies', (req: Request, res: Response) => {
   });
 });
 
-// ✅ Test login route ישיר - לבדיקה
+// Test login route for debugging
 app.post('/api/auth/test-login', async (req: Request, res: Response) => {
   console.log('🧪 Test login requested from server.ts');
   
@@ -325,11 +224,10 @@ app.post('/api/auth/test-login', async (req: Request, res: Response) => {
   });
 });
 
-// API Routes - ✅ סדר נכון וללא כפילויות
+// API Routes - proper order
 app.use('/api/auth', authRoutes);
-// ✅ הסרתי את topicsRoutes ו-userRoutes כי יש לנו routes זמניים למעלה
-// app.use('/api/topics', topicsRoutes); // ✅ מוסר זמנית
-// app.use('/api/user', userRoutes); // ✅ מוסר זמנית
+app.use('/api/topics', topicsRoutes);
+app.use('/api/user', userRoutes); // ✅ ENABLED - this is the important one!
 app.use('/api/diagnostics', diagnosticRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/user-words', userWordsRoutes);
@@ -339,18 +237,18 @@ app.use('/api/questions', questionRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/quiz', quizRoutes);
 
-// ✅ הוסף את conversation analysis routes במקום הנכון
+// Conversation analysis routes
 app.use('/api/conversation-analysis', conversationAnalysisRoutes);
 
-// ✅ Words routes - סדר חשוב! wordsToTaskRoutes לפני wordsRoutes
+// Words routes - order matters! wordsToTaskRoutes before wordsRoutes
 if (wordsToTaskRoutes) {
   console.log('📝 Registering wordsToTaskRoutes at /api/words');
-  app.use('/api/words', wordsToTaskRoutes); // רק אם הקובץ קיים
+  app.use('/api/words', wordsToTaskRoutes);
 } else {
   console.log('⚠️ wordsToTaskRoutes not available - skipping registration');
 }
 
-app.use('/api/words', wordsRoutes); // ✅ רק פעם אחת!
+app.use('/api/words', wordsRoutes);
 app.use('/api/user-profile', userProfileRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -382,7 +280,7 @@ initializeDatabase().then(() => {
     console.log(`📝 wordsToTaskRoutes loaded: ${!!wordsToTaskRoutes ? 'Yes' : 'No'}`);
     console.log(`🔥 Conversation analysis routes registered`);
     console.log(`🍪 Cookie parser enabled for authentication`);
-    console.log(`🌐 CORS configured for: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}`);
+    console.log(`🌐 CORS configured for: http://localhost:3000 and http://192.168.0.96:3000`);
   });
 }).catch(error => {
   console.error('❌ Failed to initialize database:', error);
