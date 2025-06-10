@@ -3,18 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// unity-voice-backend/src/routes/flashcardRoutes.ts
+// unity-voice-backend/src/routes/flashcardRoutes.ts - FIXED VERSION
 const express_1 = __importDefault(require("express"));
 const db_1 = require("../lib/db");
 const authMiddleware_1 = require("../middleware/authMiddleware");
-const openai_1 = require("openai");
+const wordGenerator_1 = require("../services/wordGenerator"); // ✅ Use the fixed wordGenerator
 const uuid_1 = require("uuid");
-const openai = new openai_1.AzureOpenAI({
-    apiKey: process.env.AZURE_OPENAI_API_KEY,
-    endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-    deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
-    apiVersion: "2024-04-01-preview"
-});
 const router = express_1.default.Router();
 /**
  * מקבל את רמת האנגלית של המשתמש לפי המזהה שלו
@@ -34,420 +28,100 @@ async function getUserEnglishLevel(userId) {
     }
 }
 /**
- * יוצר כרטיסיות פלאש חדשות באמצעות OpenAI לפי רמת האנגלית של המשתמש
+ * ✅ NEW: Get all words that the user has already learned for a specific topic
  */
-async function generateFlashcardsWithOpenAI(topicName, userId) {
+async function getUserLearnedWords(userId, topicName) {
     try {
-        const userEnglishLevel = await getUserEnglishLevel(String(userId));
-        console.log(`🎯 Generating words for level: ${userEnglishLevel}`);
-        let prompt = '';
-        // 🔥 עדכון כל הפרומפטים להבטיח 10 מילים
-        if (topicName === "Diplomacy and International Relations") {
-            prompt = `Generate EXACTLY 10 unique ENGLISH words related to diplomacy and international relations, appropriate for ${userEnglishLevel} level English learners.
-
-CRITICAL REQUIREMENTS:
-- You MUST generate exactly 10 words, no more, no less
-- All words must be in ENGLISH only (never Hebrew)
-- Each word must be unique and different
-- Words should be progressively challenging for ${userEnglishLevel} level
-
-Focus on these areas:
-- Diplomatic negotiations and protocols
-- International conflict resolution
-- Geopolitical strategies and alliances  
-- Cross-cultural diplomatic communication
-- International law and treaties
-- Multilateral organizations
-- Foreign policy terminology
-- Economic diplomacy
-- Security cooperation
-- Regional partnerships
-
-For each ENGLISH word, provide:
-1. The English word (not Hebrew!)
-2. Hebrew translation 
-3. Example sentence in English
-
-Response format (JSON array with exactly 10 items):
-[{
-  "word": "English word here",
-  "translation": "Hebrew translation here", 
-  "example": "English example sentence here"
-}, ...]
-
-Generate exactly 10 words at ${userEnglishLevel} difficulty level.`;
-        }
-        else if (topicName === "Economy and Entrepreneurship") {
-            prompt = `Generate EXACTLY 10 unique ENGLISH words related to economy and entrepreneurship, appropriate for ${userEnglishLevel} level English learners.
-
-CRITICAL REQUIREMENTS:
-- You MUST generate exactly 10 words, no more, no less
-- All words must be in ENGLISH only (never Hebrew)
-- Each word must be unique and different
-- Words should be progressively challenging for ${userEnglishLevel} level
-
-Focus on these areas:
-- Startup ecosystem and venture capital
-- Economic innovation and disruption
-- Financial technologies and fintech
-- Entrepreneurial strategies and methodologies
-- Market analysis and business development
-- Investment and funding mechanisms
-- Economic indicators and metrics
-- Business scalability and growth
-- Digital transformation in business
-- Global economic trends
-
-For each ENGLISH word, provide:
-1. The English word (not Hebrew!)
-2. Hebrew translation
-3. Example sentence in English
-
-Response format (JSON array with exactly 10 items):
-[{
-  "word": "English word here",
-  "translation": "Hebrew translation here",
-  "example": "English example sentence here"
-}, ...]
-
-Generate exactly 10 words at ${userEnglishLevel} difficulty level.`;
-        }
-        else if (topicName === "Environment and Sustainability") {
-            prompt = `Generate EXACTLY 10 unique ENGLISH words related to environment and sustainability, appropriate for ${userEnglishLevel} level English learners.
-
-CRITICAL REQUIREMENTS:
-- You MUST generate exactly 10 words, no more, no less
-- All words must be in ENGLISH only (never Hebrew)
-- Each word must be unique and different
-- Words should be progressively challenging for ${userEnglishLevel} level
-
-Focus on these areas:
-- Environmental conservation
-- Climate change initiatives
-- Sustainable development
-- Environmental policies
-- Renewable energy
-- Climate science
-- Conservation biology
-- Green technology
-- Environmental economics
-- Ecosystem management
-
-For each ENGLISH word, provide:
-1. The English word (not Hebrew!)
-2. Hebrew translation
-3. Example sentence in English
-
-Response format (JSON array with exactly 10 items):
-[{
-  "word": "English word here",
-  "translation": "Hebrew translation here",
-  "example": "English example sentence here"
-}, ...]
-
-Generate exactly 10 words at ${userEnglishLevel} difficulty level.`;
-        }
-        else if (topicName === "Innovation and Technology") {
-            prompt = `Generate EXACTLY 10 unique ENGLISH words related to innovation and technology, appropriate for ${userEnglishLevel} level English learners.
-
-CRITICAL REQUIREMENTS:
-- You MUST generate exactly 10 words, no more, no less
-- All words must be in ENGLISH only (never Hebrew)
-- Each word must be unique and different
-- Words should be progressively challenging for ${userEnglishLevel} level
-
-Focus on these areas:
-- Artificial intelligence and machine learning
-- Cybersecurity and digital protection
-- Software development and programming
-- Data science and analytics
-- Cloud computing and infrastructure
-- Internet of Things (IoT)
-- Blockchain and cryptocurrency
-- Biotechnology and medical innovation
-- Robotics and automation
-- Digital transformation
-
-For each ENGLISH word, provide:
-1. The English word (not Hebrew!)
-2. Hebrew translation
-3. Example sentence in English
-
-Response format (JSON array with exactly 10 items):
-[{
-  "word": "English word here",
-  "translation": "Hebrew translation here",
-  "example": "English example sentence here"
-}, ...]
-
-Generate exactly 10 words at ${userEnglishLevel} difficulty level.`;
-        }
-        else if (topicName === "History and Heritage") {
-            prompt = `Generate EXACTLY 10 unique ENGLISH words related to history and heritage, appropriate for ${userEnglishLevel} level English learners.
-
-CRITICAL REQUIREMENTS:
-- You MUST generate exactly 10 words, no more, no less
-- All words must be in ENGLISH only (never Hebrew)
-- Each word must be unique and different
-- Words should be progressively challenging for ${userEnglishLevel} level
-
-Focus on these areas:
-- Historical milestones and events
-- Cultural heritage preservation
-- Archaeological discoveries
-- Historical movements and revolutions
-- Ancient civilizations
-- Medieval and modern history
-- Historical documentation
-- Cultural traditions
-- Historical analysis
-- Heritage conservation
-
-For each ENGLISH word, provide:
-1. The English word (not Hebrew!)
-2. Hebrew translation
-3. Example sentence in English
-
-Response format (JSON array with exactly 10 items):
-[{
-  "word": "English word here",
-  "translation": "Hebrew translation here",
-  "example": "English example sentence here"
-}, ...]
-
-Generate exactly 10 words at ${userEnglishLevel} difficulty level.`;
-        }
-        else if (topicName === "Holocaust and Revival") {
-            prompt = `Generate EXACTLY 10 unique ENGLISH words related to Holocaust remembrance and revival, appropriate for ${userEnglishLevel} level English learners.
-
-CRITICAL REQUIREMENTS:
-- You MUST generate exactly 10 words, no more, no less
-- All words must be in ENGLISH only (never Hebrew)
-- Each word must be unique and different
-- Words should be progressively challenging for ${userEnglishLevel} level
-
-Focus on these areas:
-- Holocaust remembrance and education
-- Resilience and recovery
-- Historical documentation and testimony
-- Cultural preservation and revival
-- Memory and commemoration
-- Survivor narratives
-- Historical justice
-- Community rebuilding
-- Cultural renaissance
-- Hope and renewal
-
-For each ENGLISH word, provide:
-1. The English word (not Hebrew!)
-2. Hebrew translation
-3. Example sentence in English
-
-Response format (JSON array with exactly 10 items):
-[{
-  "word": "English word here",
-  "translation": "Hebrew translation here",
-  "example": "English example sentence here"
-}, ...]
-
-Generate exactly 10 words at ${userEnglishLevel} difficulty level.`;
-        }
-        else if (topicName === "Iron Swords War") {
-            prompt = `Generate EXACTLY 10 unique ENGLISH words related to recent conflicts and international relations, appropriate for ${userEnglishLevel} level English learners.
-
-CRITICAL REQUIREMENTS:
-- You MUST generate exactly 10 words, no more, no less
-- All words must be in ENGLISH only (never Hebrew)
-- Each word must be unique and different
-- Words should be progressively challenging for ${userEnglishLevel} level
-
-Focus on these areas:
-- Military operations and strategy
-- International response and diplomacy
-- Humanitarian concerns and aid
-- Geopolitical implications
-- Conflict resolution and mediation
-- Security cooperation
-- Regional stability
-- International law
-- Peacekeeping efforts
-- Crisis management
-
-For each ENGLISH word, provide:
-1. The English word (not Hebrew!)
-2. Hebrew translation
-3. Example sentence in English
-
-Response format (JSON array with exactly 10 items):
-[{
-  "word": "English word here",
-  "translation": "Hebrew translation here",
-  "example": "English example sentence here"
-}, ...]
-
-Generate exactly 10 words at ${userEnglishLevel} difficulty level.`;
-        }
-        else if (topicName === "Society and Multiculturalism") {
-            prompt = `Generate EXACTLY 10 unique ENGLISH words related to social dynamics and multicultural interactions, appropriate for ${userEnglishLevel} level English learners.
-
-CRITICAL REQUIREMENTS:
-- You MUST generate exactly 10 words, no more, no less
-- All words must be in ENGLISH only (never Hebrew)
-- Each word must be unique and different
-- Words should be progressively challenging for ${userEnglishLevel} level
-
-Focus on these areas:
-- Social interaction and communication
-- Multicultural communities
-- Cultural diversity and inclusion
-- Social integration and adaptation
-- Community dynamics
-- Cross-cultural understanding
-- Social justice and equality
-- Immigration and migration
-- Cultural exchange
-- Social cohesion
-
-For each ENGLISH word, provide:
-1. The English word (not Hebrew!)
-2. Hebrew translation
-3. Example sentence in English
-
-Response format (JSON array with exactly 10 items):
-[{
-  "word": "English word here",
-  "translation": "Hebrew translation here",
-  "example": "English example sentence here"
-}, ...]
-
-Generate exactly 10 words at ${userEnglishLevel} difficulty level.`;
-        }
-        else {
-            // פרומפט כללי מתוקן
-            prompt = `Generate EXACTLY 10 unique ENGLISH words related to ${topicName}, appropriate for ${userEnglishLevel} level English learners.
-
-CRITICAL REQUIREMENTS:
-- You MUST generate exactly 10 words, no more, no less
-- All words must be in ENGLISH only (never Hebrew)
-- Each word must be unique and different
-- Words should be progressively challenging for ${userEnglishLevel} level
-
-For each ENGLISH word, provide:
-1. The English word (not Hebrew!)
-2. Hebrew translation
-3. Example sentence in English
-
-Response format (JSON array with exactly 10 items):
-[{
-  "word": "English word here",
-  "translation": "Hebrew translation here",
-  "example": "English example sentence here"
-}, ...]
-
-Generate exactly 10 words at ${userEnglishLevel} difficulty level related to ${topicName}.`;
-        }
-        // שליחת בקשה ל-OpenAI
-        const completion = await openai.chat.completions.create({
-            model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || "gpt-4o",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are an English vocabulary assistant. You MUST generate exactly 10 ENGLISH words with their Hebrew translations. Always count your words and ensure you provide exactly 10."
-                },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000
-        });
-        // עיבוד התשובה
-        const responseText = completion.choices[0].message.content?.trim() || '';
-        console.log('🤖 AI Response preview:', responseText.substring(0, 300) + '...');
-        let wordsData;
-        try {
-            const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-            const jsonString = jsonMatch ? jsonMatch[0] : responseText;
-            wordsData = JSON.parse(jsonString);
-            // וודא שקיבלנו מערך
-            if (!Array.isArray(wordsData)) {
-                throw new Error('Response is not an array');
-            }
-            // בדיקת תקינות: וודא שכל המילים באנגלית
-            const validWords = wordsData.filter((item) => {
-                const word = item.word || '';
-                const isEnglish = /^[a-zA-Z\s\-']+$/.test(word);
-                const hasHebrew = /[\u0590-\u05FF]/.test(word);
-                if (!isEnglish || hasHebrew) {
-                    console.log(`❌ Rejecting non-English word: "${word}"`);
-                    return false;
-                }
-                return true;
-            });
-            console.log(`✅ Validated ${validWords.length} English words out of ${wordsData.length} generated`);
-            wordsData = validWords;
-        }
-        catch (jsonError) {
-            console.error('Error parsing OpenAI response as JSON:', jsonError);
-            return [];
-        }
-        if (!Array.isArray(wordsData) || wordsData.length === 0) {
-            console.error('❌ No valid English words generated');
-            return [];
-        }
-        // שמירת המילים במסד הנתונים
         const pool = await (0, db_1.getDbPool)();
-        const savedWords = [];
-        for (const item of wordsData) {
-            const wordId = (0, uuid_1.v4)();
-            const { word, translation, example = "" } = item;
-            // בדיקה נוספת שהמילה באנגלית
-            if (!/^[a-zA-Z\s\-']+$/.test(word) || /[\u0590-\u05FF]/.test(word)) {
-                console.log(`⏭️ Skipping non-English word: "${word}"`);
-                continue;
-            }
-            // בדיקה אם המילה כבר קיימת
-            const [existingWords] = await pool.execute('SELECT * FROM words WHERE Word = ? AND TopicName = ?', [word, topicName]);
-            if (Array.isArray(existingWords) && existingWords.length > 0) {
-                const existingWord = existingWords[0];
-                savedWords.push({
-                    WordId: existingWord.WordId,
-                    Word: word,
-                    Translation: translation,
-                    ExampleUsage: example,
-                    TopicName: topicName,
-                    EnglishLevel: existingWord.EnglishLevel || userEnglishLevel
-                });
-                continue;
-            }
-            // שמירת מילה חדשה
-            console.log(`💾 Saving ENGLISH word: "${word}" with level: ${userEnglishLevel}`);
-            await pool.execute(`INSERT INTO words 
-         (WordId, Word, Translation, ExampleUsage, TopicName, EnglishLevel, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`, [
-                wordId,
-                word,
-                translation,
-                example,
-                topicName,
-                userEnglishLevel
-            ]);
-            savedWords.push({
-                WordId: wordId,
-                Word: word,
-                Translation: translation,
-                ExampleUsage: example,
-                TopicName: topicName,
-                EnglishLevel: userEnglishLevel
-            });
+        // Get all words that the user has already learned for this topic
+        const [learnedWords] = await pool.execute(`SELECT DISTINCT w.Word
+       FROM words w
+       JOIN wordintask wit ON w.WordId = wit.WordId
+       JOIN tasks t ON wit.TaskId = t.TaskId
+       WHERE t.UserId = ? AND w.TopicName = ?`, [userId, topicName]);
+        if (Array.isArray(learnedWords)) {
+            const words = learnedWords.map((row) => row.Word);
+            console.log(`📚 User has learned ${words.length} words for topic "${topicName}":`, words.slice(0, 5).join(', ') + (words.length > 5 ? '...' : ''));
+            return words;
         }
-        console.log(`✅ Generated and saved ${savedWords.length} ENGLISH words`);
-        return savedWords;
+        return [];
     }
     catch (error) {
-        console.error('Error generating flashcards with OpenAI:', error);
+        console.error('Error getting user learned words:', error);
         return [];
     }
 }
-// 🔥 נתיב עיקרי מתוקן לקבלת כרטיסיות פלאש לפי נושא ורמה - עם הבטחה ל-5-7 מילים
+/**
+ * ✅ IMPROVED: יוצר כרטיסיות פלאש חדשות באמצעות wordGenerator עם מניעת כפילויות
+ */
+async function generateFlashcardsWithWordGenerator(topicName, userId, userEnglishLevel, existingWords = []) {
+    try {
+        console.log(`🎯 Generating words for level: ${userEnglishLevel}`);
+        console.log(`🚫 Avoiding ${existingWords.length} existing words`);
+        // ✅ Use the fixed wordGenerator that accepts existingWords parameter
+        const newWords = await (0, wordGenerator_1.generateWords)(userEnglishLevel, topicName, existingWords);
+        console.log(`✅ wordGenerator returned ${newWords.length} new words`);
+        if (newWords.length === 0) {
+            console.log('❌ wordGenerator returned no words');
+            return [];
+        }
+        // Save the words to database if they don't exist
+        const pool = await (0, db_1.getDbPool)();
+        const savedWords = [];
+        for (const wordData of newWords) {
+            try {
+                // Check if word already exists in database
+                const [existingInDb] = await pool.execute('SELECT WordId, Word, Translation, ExampleUsage FROM words WHERE Word = ? AND TopicName = ?', [wordData.Word, topicName]);
+                if (Array.isArray(existingInDb) && existingInDb.length > 0) {
+                    // Word exists in DB, use existing data
+                    const existingWord = existingInDb[0];
+                    savedWords.push({
+                        WordId: existingWord.WordId,
+                        Word: existingWord.Word,
+                        Translation: existingWord.Translation,
+                        ExampleUsage: existingWord.ExampleUsage,
+                        TopicName: topicName,
+                        EnglishLevel: userEnglishLevel
+                    });
+                    console.log(`📖 Using existing word from DB: ${wordData.Word}`);
+                }
+                else {
+                    // Word doesn't exist, save it
+                    const wordId = wordData.WordId || (0, uuid_1.v4)();
+                    await pool.execute(`INSERT INTO words 
+             (WordId, Word, Translation, ExampleUsage, TopicName, EnglishLevel, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`, [
+                        wordId,
+                        wordData.Word,
+                        wordData.Translation || '',
+                        wordData.ExampleUsage || '',
+                        topicName,
+                        userEnglishLevel
+                    ]);
+                    savedWords.push({
+                        WordId: wordId,
+                        Word: wordData.Word,
+                        Translation: wordData.Translation || '',
+                        ExampleUsage: wordData.ExampleUsage || '',
+                        TopicName: topicName,
+                        EnglishLevel: userEnglishLevel
+                    });
+                    console.log(`💾 Saved new word to DB: ${wordData.Word}`);
+                }
+            }
+            catch (wordError) {
+                console.error(`❌ Error processing word "${wordData.Word}":`, wordError);
+            }
+        }
+        console.log(`✅ Successfully processed ${savedWords.length} words`);
+        return savedWords;
+    }
+    catch (error) {
+        console.error('❌ Error in generateFlashcardsWithWordGenerator:', error);
+        return [];
+    }
+}
+// 🔥 נתיב עיקרי מתוקן לקבלת כרטיסיות פלאש לפי נושא ורמה - עם מניעת כפילויות
 router.get('/:topic/:level', authMiddleware_1.authMiddleware, async (req, res) => {
     const requestId = Date.now().toString();
     try {
@@ -475,6 +149,8 @@ router.get('/:topic/:level', authMiddleware_1.authMiddleware, async (req, res) =
         // קבלת רמת האנגלית של המשתמש
         const userEnglishLevel = await getUserEnglishLevel(String(userId));
         console.log(`📊 [${requestId}] User English level: "${userEnglishLevel}"`);
+        // ✅ NEW: Get user's learned words for this topic
+        const learnedWords = await getUserLearnedWords(String(userId), topic);
         // 🔥 שאילתה מתוקנת - מחפשים מילים שלא נלמדו על ידי המשתמש
         const query = `
       SELECT DISTINCT w.WordId, w.Word, w.Translation, w.ExampleUsage, w.TopicName, w.EnglishLevel
@@ -501,33 +177,33 @@ router.get('/:topic/:level', authMiddleware_1.authMiddleware, async (req, res) =
             console.log(`🤖 [${requestId}] Need more words (${availableWords.length}/${REQUIRED_MIN_WORDS}), generating with AI...`);
             try {
                 // חשב כמה מילים נוספות אנחנו צריכים
-                const wordsNeeded = REQUIRED_MAX_WORDS - availableWords.length;
+                const wordsNeeded = Math.max(6, REQUIRED_MAX_WORDS - availableWords.length);
                 console.log(`📊 [${requestId}] Need to generate ${wordsNeeded} additional words`);
-                const newWords = await generateFlashcardsWithOpenAI(topic, userId);
+                // ✅ FIXED: Pass learned words to prevent duplicates
+                const newWords = await generateFlashcardsWithWordGenerator(topic, String(userId), userEnglishLevel, learnedWords // ✅ This prevents generating words the user already learned
+                );
                 console.log(`✅ [${requestId}] Generated ${newWords.length} new words with AI`);
                 // סנן מילים חדשות שלא נלמדו עדיין ואין כפילויות
                 const filteredNewWords = [];
                 const existingWordIds = new Set(availableWords.map((w) => w.WordId));
+                const existingWordTexts = new Set(availableWords.map((w) => w.Word.toLowerCase()));
                 for (const newWord of newWords) {
-                    // בדוק שהמילה לא קיימת כבר ברשימה שלנו
-                    if (existingWordIds.has(newWord.WordId)) {
+                    // בדוק שהמילה לא קיימת כבר ברשימה שלנו (לא לפי ID אלא לפי טקסט)
+                    if (existingWordIds.has(newWord.WordId) || existingWordTexts.has(newWord.Word.toLowerCase())) {
                         console.log(`⏭️ [${requestId}] Skipping duplicate word: ${newWord.Word}`);
                         continue;
                     }
-                    // בדוק שהמילה לא נלמדה על ידי המשתמש
-                    const [learned] = await pool.execute(`SELECT 1 FROM wordintask wit
-             JOIN tasks t ON wit.TaskId = t.TaskId
-             WHERE t.UserId = ? AND t.TopicName = ? AND wit.WordId = ?`, [String(userId), topic, newWord.WordId]);
-                    if (!Array.isArray(learned) || learned.length === 0) {
-                        filteredNewWords.push(newWord);
-                        existingWordIds.add(newWord.WordId);
-                        // הפסק אם הגענו למספר המילים שאנחנו צריכים
-                        if (filteredNewWords.length >= wordsNeeded) {
-                            break;
-                        }
-                    }
-                    else {
+                    // בדוק שהמילה לא נלמדה על ידי המשתמש (כפול ביטחון)
+                    if (learnedWords.includes(newWord.Word)) {
                         console.log(`⏭️ [${requestId}] Skipping already learned word: ${newWord.Word}`);
+                        continue;
+                    }
+                    filteredNewWords.push(newWord);
+                    existingWordIds.add(newWord.WordId);
+                    existingWordTexts.add(newWord.Word.toLowerCase());
+                    // הפסק אם הגענו למספר המילים שאנחנו צריכים
+                    if (filteredNewWords.length >= wordsNeeded) {
+                        break;
                     }
                 }
                 console.log(`🔍 [${requestId}] Filtered to ${filteredNewWords.length} truly new words`);
@@ -542,7 +218,14 @@ router.get('/:topic/:level', authMiddleware_1.authMiddleware, async (req, res) =
                         error: 'Insufficient words available and failed to generate new ones',
                         requestId,
                         availableWords: availableWords.length,
-                        minimumRequired: REQUIRED_MIN_WORDS
+                        minimumRequired: REQUIRED_MIN_WORDS,
+                        debug: {
+                            topic,
+                            userLevel: userEnglishLevel,
+                            userId: String(userId),
+                            learnedWordsCount: learnedWords.length,
+                            errorMessage: aiError instanceof Error ? aiError.message : 'Unknown AI error'
+                        }
                     });
                 }
             }
@@ -568,7 +251,9 @@ router.get('/:topic/:level', authMiddleware_1.authMiddleware, async (req, res) =
                 debug: {
                     topic,
                     userLevel: userEnglishLevel,
-                    userId: String(userId)
+                    userId: String(userId),
+                    learnedWordsCount: learnedWords.length,
+                    learnedWords: learnedWords.slice(0, 10) // Show first 10 learned words for debugging
                 }
             });
         }
@@ -583,7 +268,8 @@ router.get('/:topic/:level', authMiddleware_1.authMiddleware, async (req, res) =
                 existingWords: Array.isArray(existingWords) ? existingWords.length : 0,
                 newWordsGenerated: Math.max(0, finalWords.length - (Array.isArray(existingWords) ? existingWords.length : 0)),
                 userLevel: userEnglishLevel,
-                topic: topic
+                topic: topic,
+                learnedWordsCount: learnedWords.length
             }
         });
     }
