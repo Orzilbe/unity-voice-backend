@@ -89,8 +89,18 @@ class User {
     static async create(userData) {
         try {
             console.log('📝 Starting user creation for:', userData.Email);
-            // בדיקת validation
-            this.validateUserInput(userData);
+            // בדיקת validation - יצירת אובייקט זמני לvalidation
+            const tempUser = {
+                Email: userData.Email,
+                FirstName: userData.FirstName,
+                LastName: userData.LastName,
+                Password: userData.Password,
+                PhoneNumber: userData.PhoneNumber,
+                AgeRange: userData.AgeRange,
+                EnglishLevel: userData.EnglishLevel,
+                UserRole: userData.UserRole
+            };
+            this.validateUserInput(tempUser);
             // Hash password
             const salt = await bcryptjs_1.default.genSalt(12); // הגדלתי ל-12 לבטחון טוב יותר
             const hashedPassword = await bcryptjs_1.default.hash(userData.Password, salt);

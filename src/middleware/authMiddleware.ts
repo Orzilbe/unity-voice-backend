@@ -84,8 +84,8 @@ export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunct
     
     // הוסף את המשתמש לrequest
     req.user = {
-      id: decoded.id || decoded.userId,
-      userId: (decoded.userId || decoded.id)?.toString(),
+      id: (decoded.id || decoded.userId) as number,
+      userId: (decoded.userId || decoded.id)?.toString() || '',
       email: decoded.email,
       role: decoded.role
     };
@@ -113,7 +113,7 @@ export const authMiddleware = (req: IUserRequest, res: Response, next: NextFunct
       success: false,
       message,
       debug: {
-        errorType: error.constructor.name,
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
         hasJwtSecret: !!process.env.JWT_SECRET
       }
     });

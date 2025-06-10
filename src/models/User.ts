@@ -131,8 +131,19 @@ class User {
     try {
       console.log('📝 Starting user creation for:', userData.Email);
       
-      // בדיקת validation
-      this.validateUserInput(userData);
+      // בדיקת validation - יצירת אובייקט זמני לvalidation
+      const tempUser: Partial<IUser> = {
+        Email: userData.Email,
+        FirstName: userData.FirstName,
+        LastName: userData.LastName,
+        Password: userData.Password,
+        PhoneNumber: userData.PhoneNumber,
+        AgeRange: userData.AgeRange,
+        EnglishLevel: userData.EnglishLevel,
+        UserRole: userData.UserRole
+      } as Partial<IUser>;
+      
+      this.validateUserInput(tempUser);
       
       // Hash password
       const salt = await bcrypt.genSalt(12); // הגדלתי ל-12 לבטחון טוב יותר
