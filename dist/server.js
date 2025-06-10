@@ -51,8 +51,7 @@ app.use((0, helmet_1.default)()); // Adds security headers
 // CORS configuration with credentials support
 app.use((0, cors_1.default)({
     origin: [
-        'http://localhost:3000',
-        'http://192.168.0.96:3000'
+        'https://unity-voice-frontend.vercel.app' // 🚀 הוסף את זה!
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
