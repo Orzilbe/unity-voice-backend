@@ -1,9 +1,9 @@
-// apps/api/src/models/User.ts
+// unity-voice-backend/src/models/User.ts - תיקון בעיות
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import bcrypt from 'bcryptjs';
 import validator from 'validator';
 import crypto from 'crypto';
-import pool from './db';
+import DatabaseConnection from '../config/database'; // תיקון: השתמש ב-DatabaseConnection
 
 export enum EnglishLevel {
   BEGINNER = "beginner",
@@ -25,6 +25,7 @@ export enum UserRole {
   USER = "user",
   ADMIN = "admin",
 }
+
 export interface IUser extends RowDataPacket {
   UserId: string;
   Email: string;
@@ -42,20 +43,16 @@ export interface IUser extends RowDataPacket {
   IsActive: boolean;
 }
 
-
 class User {
-   private static validateUserInput(userData: Partial<IUser>): void {
-    // Email validation
+  private static validateUserInput(userData: Partial<IUser>): void {
     if (userData.Email && !validator.isEmail(userData.Email)) {
       throw new Error('Invalid email address');
     }
 
-    // Phone number validation (optional, adjust regex as needed)
     if (userData.PhoneNumber && !validator.isMobilePhone(userData.PhoneNumber, 'any')) {
       throw new Error('Invalid phone number');
     }
 
-    // Password strength validation (when creating/updating password)
     if (userData.Password && !validator.isStrongPassword(userData.Password, {
       minLength: 8,
       minLowercase: 1,
@@ -66,7 +63,6 @@ class User {
       throw new Error('Password does not meet strength requirements');
     }
 
-    // Validate enum values
     if (userData.UserRole && !Object.values(UserRole).includes(userData.UserRole)) {
       throw new Error('Invalid user role');
     }
@@ -80,21 +76,25 @@ class User {
     }
   }
 
-  // Generate a more robust unique user ID
   private static generateUserId(): string {
-    return `usr_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`;
+    const timestamp = Date.now().toString(36);
+    const randomPart = crypto.randomBytes(4).toString('hex');
+    return `usr_${timestamp}_${randomPart}`;
   }
+
   // Find user by ID
   static async findById(userId: string): Promise<IUser | null> {
     try {
+      const pool = DatabaseConnection.getPool();
+      
       const [rows] = await pool.execute<IUser[]>(
-        'SELECT * FROM Users WHERE UserId = ?',
+        'SELECT * FROM Users WHERE UserId = ? AND IsActive = 1',
         [userId]
       );
       
       return rows.length ? rows[0] : null;
     } catch (error) {
-      console.error('Error finding user by ID:', error);
+      console.error('❌ Error finding user by ID:', error);
       throw error;
     }
   }
@@ -102,115 +102,143 @@ class User {
   // Find user by email
   static async findByEmail(email: string): Promise<IUser | null> {
     try {
+      const pool = DatabaseConnection.getPool();
+      
       const [rows] = await pool.execute<IUser[]>(
-        'SELECT * FROM Users WHERE Email = ?',
+        'SELECT * FROM Users WHERE Email = ? AND IsActive = 1',
         [email]
       );
       
       return rows.length ? rows[0] : null;
     } catch (error) {
-      console.error('Error finding user by email:', error);
+      console.error('❌ Error finding user by email:', error);
       throw error;
     }
   }
 
   // Create a new user
-// Create a new user
-static async create(userData: {
-  Email: string;
-  FirstName: string;
-  LastName: string;
-  Password: string;
-  PhoneNumber: string;
-  AgeRange: AgeRange;
-  EnglishLevel: EnglishLevel;
-  ProfilePicture?: string;
-  UserRole?: UserRole;
-}): Promise<string> {
-  try {
-    console.log('Starting user creation with data:', {
-      ...userData,
-      Password: '***HIDDEN***' // מסתיר את הסיסמה מהלוג
-    });
-    
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(userData.Password, salt);
-    
-    // Generate unique ID for user
-    const userId = this.generateUserId(); // השתמש בפונקציה הקיימת
-    
-    // Set default values
-    const userRole = userData.UserRole || UserRole.USER;
-    const creationDate = new Date();
-    
-    console.log('Executing SQL query for user creation');
-    console.log('UserId:', userId);
-    
-    // בדוק את המבנה המדויק של הטבלה - ללא שדה Badge
-    const [result] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO Users 
-       (UserId, Email, FirstName, LastName, Password, PhoneNumber, AgeRange, 
-        EnglishLevel, ProfilePicture, Score, CreationDate, UserRole, IsActive)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
+  static async create(userData: {
+    Email: string;
+    FirstName: string;
+    LastName: string;
+    Password: string;
+    PhoneNumber: string;
+    AgeRange: AgeRange;
+    EnglishLevel: EnglishLevel;
+    ProfilePicture?: string;
+    UserRole?: UserRole;
+  }): Promise<string> {
+    try {
+      console.log('📝 Starting user creation for:', userData.Email);
+      
+      // בדיקת validation
+      this.validateUserInput(userData);
+      
+      // Hash password
+      const salt = await bcrypt.genSalt(12); // הגדלתי ל-12 לבטחון טוב יותר
+      const hashedPassword = await bcrypt.hash(userData.Password, salt);
+      
+      // Generate unique ID
+      const userId = this.generateUserId();
+      
+      // Set defaults
+      const userRole = userData.UserRole || UserRole.USER;
+      const creationDate = new Date();
+      
+      console.log('📝 Creating user with ID:', userId);
+      
+      const pool = DatabaseConnection.getPool();
+      
+      // בדיקה שהשדות תואמים למבנה הטבלה
+      const [result] = await pool.execute<ResultSetHeader>(
+        `INSERT INTO Users 
+         (UserId, Email, FirstName, LastName, Password, PhoneNumber, AgeRange, 
+          EnglishLevel, ProfilePicture, Score, CreationDate, UserRole, IsActive)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          userId,
+          userData.Email,
+          userData.FirstName, 
+          userData.LastName,
+          hashedPassword,
+          userData.PhoneNumber,
+          userData.AgeRange,
+          userData.EnglishLevel,
+          userData.ProfilePicture || null,
+          0, // Initial score
+          creationDate,
+          userRole,
+          true // IsActive
+        ]
+      );
+      
+      console.log('✅ User creation result:', {
         userId,
-        userData.Email,
-        userData.FirstName, 
-        userData.LastName,
-        hashedPassword,
-        userData.PhoneNumber,
-        userData.AgeRange,
-        userData.EnglishLevel,
-        userData.ProfilePicture || null,
-        0, // Initial score
-        creationDate,
-        userRole,
-        true // IsActive
-      ]
-    );
-    
-    console.log('SQL execution result:', result);
-    
-    if (result.affectedRows !== 1) {
-      throw new Error('Failed to create user');
+        affectedRows: result.affectedRows,
+        insertId: result.insertId
+      });
+      
+      if (result.affectedRows !== 1) {
+        throw new Error('Failed to create user - no rows affected');
+      }
+      
+      console.log('✅ User created successfully:', userId);
+      return userId;
+      
+    } catch (error) {
+      console.error('❌ Detailed error in user creation:', error);
+      
+      // טיפול בשגיאות SQL ספציפיות
+      if (error instanceof Error) {
+        if ('code' in error) {
+          const sqlError = error as any;
+          
+          switch (sqlError.code) {
+            case 'ER_DUP_ENTRY':
+              throw new Error('User with this email already exists');
+            case 'ER_NO_SUCH_TABLE':
+              throw new Error('Database table not found');
+            case 'ER_BAD_FIELD_ERROR':
+              throw new Error('Database column mismatch');
+            case 'ER_DATA_TOO_LONG':
+              throw new Error('One or more fields exceed maximum length');
+            default:
+              console.error('Unknown SQL error:', sqlError);
+          }
+        }
+      }
+      
+      throw error;
     }
-    
-    return userId;
-  } catch (error) {
-    console.error('Detailed error in user creation:', error);
-    // פירוט נוסף על השגיאה
-    if (error instanceof Error) {
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      if ('code' in error) {
-        console.error('SQL error code:', (error as any).code);
-      }
-      if ('errno' in error) {
-        console.error('SQL error number:', (error as any).errno);
-      }
-      if ('sqlMessage' in error) {
-        console.error('SQL message:', (error as any).sqlMessage);
-      }
-    }
-    throw error;
   }
-}
 
   // Update password
   static async updatePassword(userId: string, newPassword: string): Promise<boolean> {
     try {
-      const salt = await bcrypt.genSalt(10);
+      // Validate password
+      if (!validator.isStrongPassword(newPassword, {
+        minLength: 8,
+        minLowercase: 1,
+        minUppercase: 1,
+        minNumbers: 1,
+        minSymbols: 1
+      })) {
+        throw new Error('New password does not meet strength requirements');
+      }
+      
+      const salt = await bcrypt.genSalt(12);
       const hashedPassword = await bcrypt.hash(newPassword, salt);
       
+      const pool = DatabaseConnection.getPool();
+      
       const [result] = await pool.execute<ResultSetHeader>(
-        'UPDATE Users SET Password = ? WHERE UserId = ?',
+        'UPDATE Users SET Password = ? WHERE UserId = ? AND IsActive = 1',
         [hashedPassword, userId]
       );
       
       return result.affectedRows > 0;
     } catch (error) {
-      console.error('Error updating password:', error);
+      console.error('❌ Error updating password:', error);
       throw error;
     }
   }
@@ -218,14 +246,16 @@ static async create(userData: {
   // Update last login
   static async updateLastLogin(userId: string): Promise<boolean> {
     try {
+      const pool = DatabaseConnection.getPool();
+      
       const [result] = await pool.execute<ResultSetHeader>(
-        'UPDATE Users SET LastLogin = NOW() WHERE UserId = ?',
+        'UPDATE Users SET LastLogin = NOW() WHERE UserId = ? AND IsActive = 1',
         [userId]
       );
       
       return result.affectedRows > 0;
     } catch (error) {
-      console.error('Error updating last login:', error);
+      console.error('❌ Error updating last login:', error);
       throw error;
     }
   }
@@ -235,14 +265,16 @@ static async create(userData: {
     try {
       return await bcrypt.compare(candidatePassword, user.Password);
     } catch (error) {
-      console.error('Error comparing password:', error);
+      console.error('❌ Error comparing password:', error);
       throw error;
     }
   }
 
-  // Delete user (soft delete)
+  // Soft delete user
   static async delete(userId: string): Promise<boolean> {
     try {
+      const pool = DatabaseConnection.getPool();
+      
       const [result] = await pool.execute<ResultSetHeader>(
         'UPDATE Users SET IsActive = false WHERE UserId = ?',
         [userId]
@@ -250,7 +282,33 @@ static async create(userData: {
       
       return result.affectedRows > 0;
     } catch (error) {
-      console.error('Error deleting user:', error);
+      console.error('❌ Error deleting user:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to get user stats
+  static async getUserStats(userId: string): Promise<any> {
+    try {
+      const pool = DatabaseConnection.getPool();
+      
+      const [stats] = await pool.execute(
+        `SELECT 
+          u.Score,
+          u.CreationDate,
+          COUNT(DISTINCT s.SessionId) as totalSessions,
+          COUNT(DISTINCT t.TaskId) as completedTasks
+         FROM Users u
+         LEFT JOIN Sessions s ON u.UserId = s.UserId
+         LEFT JOIN Tasks t ON u.UserId = t.UserId AND t.CompletionDate IS NOT NULL
+         WHERE u.UserId = ? AND u.IsActive = 1
+         GROUP BY u.UserId`,
+        [userId]
+      );
+      
+      return (stats as any[])[0] || null;
+    } catch (error) {
+      console.error('❌ Error getting user stats:', error);
       throw error;
     }
   }

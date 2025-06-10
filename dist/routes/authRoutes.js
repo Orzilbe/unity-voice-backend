@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// unity-voice-backend/src/routes/authRoutes.ts
+// unity-voice-backend/src/routes/authRoutes.ts - תיקון בעיות
 const express_1 = __importDefault(require("express"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_1 = __importDefault(require("../models/User"));
@@ -13,63 +13,41 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const database_1 = __importDefault(require("../config/database"));
 const userLevelService_1 = require("../services/userLevelService");
 const router = express_1.default.Router();
-// ✅ הגדרת אפשרויות cookies לפיתוח מקומי בלבד
+// ✅ הגדרת אפשרויות cookies
 const cookieOptions = {
     httpOnly: true,
-    secure: false, // false לפיתוח מקומי
+    secure: process.env.NODE_ENV === 'production', // true רק לproduction
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000,
     path: '/',
 };
-// ✅ תיקון validate endpoint עם debug מתקדם
+// ✅ Token validation endpoint - ללא authMiddleware!
 router.post('/validate', async (req, res) => {
-    console.log('🔍 Raw Authorization header:', req.headers.authorization);
-    console.log('🔍 All headers:', Object.keys(req.headers));
-    console.log('🔍 Body:', req.body);
-    console.log('🔍 Cookies:', req.cookies);
+    console.log('🔍 Token validation request received');
     try {
-        console.log('🔍 Token validation request received');
-        console.log('📋 Headers:', JSON.stringify(req.headers, null, 2));
-        console.log('📋 Body:', JSON.stringify(req.body, null, 2));
-        console.log('🍪 Cookies:', JSON.stringify(req.cookies, null, 2));
-        // קבל טוכן מה-header או מה-body
         let token = req.headers.authorization;
-        if (token) {
-            // אם יש Bearer, הסר אותו. אם אין, השאר כמו שזה
-            token = token.replace(/^Bearer\s+/i, '');
+        if (token && token.startsWith('Bearer ')) {
+            token = token.substring(7); // הסר "Bearer "
         }
         if (!token && req.body.token) {
             token = req.body.token;
-            console.log('📝 Token found in request body');
         }
-        // 🆕 גם ננסה לחפש בcookies
         if (!token && req.cookies?.authToken) {
             token = req.cookies.authToken;
-            console.log('🍪 Token found in cookies');
         }
         console.log('🔍 Token found:', token ? 'Yes' : 'No');
-        console.log('🔍 Token preview:', token ? token.substring(0, 20) + '...' : 'None');
         if (!token) {
             console.log('❌ No token provided');
             return res.status(401).json({
                 success: false,
                 valid: false,
-                message: 'No token provided',
-                debug: {
-                    hasAuthHeader: !!req.headers.authorization,
-                    hasBodyToken: !!req.body.token,
-                    hasCookieToken: !!req.cookies?.authToken,
-                    cookieKeys: req.cookies ? Object.keys(req.cookies) : [],
-                    headerKeys: Object.keys(req.headers)
-                }
+                message: 'No token provided'
             });
         }
-        // בדוק את הטוקן
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
         console.log('✅ Token validation successful:', {
             userId: decoded.userId || decoded.id,
-            email: decoded.email,
-            tokenType: typeof decoded
+            email: decoded.email
         });
         res.json({
             success: true,
@@ -83,30 +61,39 @@ router.post('/validate', async (req, res) => {
     }
     catch (error) {
         console.error('❌ Token validation failed:', error);
+        let errorMessage = 'Invalid token';
+        if (error instanceof jsonwebtoken_1.default.TokenExpiredError) {
+            errorMessage = 'Token expired';
+        }
+        else if (error instanceof jsonwebtoken_1.default.JsonWebTokenError) {
+            errorMessage = 'Malformed token';
+        }
         res.status(401).json({
             success: false,
             valid: false,
-            message: 'Invalid token',
-            debug: {
-                errorType: error instanceof Error ? error.name : 'Unknown',
-                errorMessage: error instanceof Error ? error.message : 'Unknown error',
-                hasJwtSecret: !!process.env.JWT_SECRET
-            }
+            message: errorMessage
         });
     }
 });
+// ✅ Login endpoint - תיקון הטיפול בשגיאות
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         console.log('🔐 Login attempt for:', email);
+        // בדיקת קלט בסיסית
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email and password are required'
+            });
+        }
         const pool = database_1.default.getPool();
-        const [users] = await pool.query('SELECT UserId, Email, Password FROM Users WHERE Email = ?', [email]);
+        const [users] = await pool.query('SELECT UserId, Email, Password FROM Users WHERE Email = ? AND IsActive = 1', [email]);
         if (!users || users.length === 0) {
             console.log('❌ User not found:', email);
             return res.status(401).json({
                 success: false,
-                message: 'User not found',
-                details: `No user found with email: ${email}`
+                message: 'Invalid email or password'
             });
         }
         const user = users[0];
@@ -116,8 +103,7 @@ router.post('/login', async (req, res) => {
             console.log('❌ Invalid password for:', email);
             return res.status(401).json({
                 success: false,
-                message: 'Invalid password',
-                details: 'The provided password does not match our records'
+                message: 'Invalid email or password'
             });
         }
         const token = jsonwebtoken_1.default.sign({
@@ -125,74 +111,86 @@ router.post('/login', async (req, res) => {
             userId: user.UserId,
             email: user.Email
         }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        // עדכון זמן התחברות אחרון
         await pool.query('UPDATE Users SET LastLogin = NOW() WHERE UserId = ?', [user.UserId]);
-        console.log('🍪 Login successful:', {
+        console.log('✅ Login successful:', {
             email: user.Email,
-            userId: user.UserId,
-            environment: process.env.NODE_ENV,
-            tokenLength: token.length,
-            tokenPreview: token.substring(0, 20) + '...'
+            userId: user.UserId
         });
-        // ✅ גישה היברידית: cookies לפיתוח + token לproduction
+        // הגדרת cookie בפיתוח
         if (process.env.NODE_ENV === 'development') {
-            // פיתוח מקומי - השתמש בcookies
             res.cookie('authToken', token, cookieOptions);
-            console.log('🍪 Cookie set for development');
         }
-        // ✅ תמיד החזר גם token לfrontend (לproduction)
         res.json({
             success: true,
-            token: token, // ✅ החזרנו את זה לproduction
+            token: token,
             user: {
                 id: user.UserId,
                 userId: user.UserId,
                 email: user.Email
             },
-            cookieSet: process.env.NODE_ENV === 'development',
             message: 'Login successful'
         });
     }
     catch (error) {
-        console.error('Login error:', error);
+        console.error('❌ Login error:', error);
         res.status(500).json({
             success: false,
-            message: 'Server error during login',
-            details: error instanceof Error ? error.message : 'Unknown error'
+            message: 'Server error during login'
         });
     }
 });
-router.post('/register', async (req, res, next) => {
+// ✅ Registration endpoint - הוסרנו authMiddleware והוספנו בדיקות validation
+router.post('/register', async (req, res) => {
     try {
         const { email, firstName, lastName, phoneNumber, password, englishLevel, ageRange } = req.body;
         console.log('📝 Registration attempt for:', email);
+        // בדיקת שדות נדרשים
+        const requiredFields = ['email', 'firstName', 'lastName', 'phoneNumber', 'password', 'englishLevel', 'ageRange'];
+        const missingFields = requiredFields.filter(field => !req.body[field]);
+        if (missingFields.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields',
+                missingFields
+            });
+        }
         // Validation
         const errors = [];
-        if (!email || !validator_1.default.isEmail(email)) {
+        if (!validator_1.default.isEmail(email)) {
             errors.push({ param: 'email', msg: 'Invalid email address' });
         }
-        if (!firstName || !validator_1.default.isLength(firstName, { min: 2 })) {
+        if (!validator_1.default.isLength(firstName, { min: 2 })) {
             errors.push({ param: 'firstName', msg: 'First name must be at least 2 characters' });
         }
-        if (!lastName || !validator_1.default.isLength(lastName, { min: 2 })) {
+        if (!validator_1.default.isLength(lastName, { min: 2 })) {
             errors.push({ param: 'lastName', msg: 'Last name must be at least 2 characters' });
         }
-        if (!password || !validator_1.default.isLength(password, { min: 8 }) ||
-            !password.match(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/)) {
-            errors.push({ param: 'password', msg: 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character' });
+        // בדיקת סיסמה מחמירה יותר
+        if (!password || password.length < 8) {
+            errors.push({ param: 'password', msg: 'Password must be at least 8 characters' });
         }
-        if (!phoneNumber || !validator_1.default.isMobilePhone(phoneNumber, 'any')) {
+        else if (!password.match(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/)) {
+            errors.push({ param: 'password', msg: 'Password must include uppercase, lowercase, number, and special character' });
+        }
+        if (!validator_1.default.isMobilePhone(phoneNumber, 'any')) {
             errors.push({ param: 'phoneNumber', msg: 'Invalid phone number' });
         }
-        if (!englishLevel || !Object.values(User_2.EnglishLevel).includes(englishLevel)) {
+        if (!Object.values(User_2.EnglishLevel).includes(englishLevel)) {
             errors.push({ param: 'englishLevel', msg: 'Invalid English level' });
         }
-        if (!ageRange || !Object.values(User_2.AgeRange).includes(ageRange)) {
+        if (!Object.values(User_2.AgeRange).includes(ageRange)) {
             errors.push({ param: 'ageRange', msg: 'Invalid age range' });
         }
         if (errors.length > 0) {
             console.log('❌ Validation errors:', errors);
-            return res.status(400).json({ errors });
+            return res.status(400).json({
+                success: false,
+                message: 'Validation failed',
+                errors
+            });
         }
+        // בדיקה שהמשתמש לא קיים כבר
         const existingUser = await User_1.default.findByEmail(email);
         if (existingUser) {
             console.log('❌ User already exists:', email);
@@ -201,6 +199,8 @@ router.post('/register', async (req, res, next) => {
                 message: 'User with this email already exists'
             });
         }
+        console.log('📝 Creating new user...');
+        // יצירת משתמש חדש
         const userId = await User_1.default.create({
             Email: email,
             FirstName: firstName,
@@ -211,52 +211,66 @@ router.post('/register', async (req, res, next) => {
             EnglishLevel: englishLevel,
             UserRole: User_2.UserRole.USER
         });
-        console.log('✅ User created:', userId);
-        await (0, userLevelService_1.initializeUserLevels)(userId);
+        console.log('✅ User created successfully:', userId);
+        // אתחול רמות המשתמש
+        try {
+            await (0, userLevelService_1.initializeUserLevels)(userId);
+            console.log('✅ User levels initialized');
+        }
+        catch (levelError) {
+            console.warn('⚠️ Warning: Failed to initialize user levels:', levelError);
+            // לא נעצור את התהליך בגלל זה
+        }
+        // יצירת JWT token
         const token = jsonwebtoken_1.default.sign({
-            id: parseInt(userId.toString()),
-            userId: userId.toString(),
+            id: userId,
+            userId: userId,
             email,
             role: User_2.UserRole.USER
-        }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '7d' });
-        console.log('🍪 Registration successful:', {
-            email,
-            userId,
-            environment: process.env.NODE_ENV,
-            tokenPreview: token.substring(0, 20) + '...'
-        });
-        // ✅ גישה היברידית: cookies לפיתוח + token לproduction
+        }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        console.log('✅ Registration successful for:', email);
+        // הגדרת cookie בפיתוח
         if (process.env.NODE_ENV === 'development') {
             res.cookie('authToken', token, {
                 ...cookieOptions,
                 maxAge: 7 * 24 * 60 * 60 * 1000 // 7 ימים
             });
-            console.log('🍪 Cookie set for development registration');
         }
         return res.status(201).json({
             success: true,
             message: 'User registered successfully',
-            token: token, // ✅ החזרנו את זה לproduction
+            token: token,
             user: {
                 id: userId,
-                userId: userId.toString(),
+                userId: userId,
                 email,
                 firstName,
                 lastName,
                 englishLevel,
                 role: User_2.UserRole.USER
-            },
-            cookieSet: process.env.NODE_ENV === 'development'
+            }
         });
     }
     catch (error) {
-        console.error('Registration error:', error);
-        next(error);
+        console.error('❌ Registration error:', error);
+        // בדיקה אם זו שגיאת DB
+        if (error instanceof Error) {
+            if (error.message.includes('Duplicate entry')) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'User with this email already exists'
+                });
+            }
+        }
+        res.status(500).json({
+            success: false,
+            message: 'Server error during registration'
+        });
     }
 });
+// ✅ Logout endpoint
 router.post('/logout', (req, res) => {
     console.log('🚪 Logout requested');
-    // מחיקת cookie אם זה פיתוח מקומי
     if (process.env.NODE_ENV === 'development') {
         res.clearCookie('authToken', {
             path: '/',
@@ -264,21 +278,18 @@ router.post('/logout', (req, res) => {
             secure: false,
             sameSite: 'lax'
         });
-        console.log('🍪 Cookie cleared for development');
     }
     res.json({
         success: true,
         message: 'Logged out successfully'
     });
 });
-router.get('/register', (req, res) => {
-    res.status(405).json({
-        message: 'Method not allowed',
-        details: 'Registration requires a POST request with user data.',
-        expectedMethod: 'POST'
-    });
-});
+// ✅ Debug endpoint - עם הגנה נוספת
 router.get('/debug-user', async (req, res) => {
+    // רק בפיתוח
+    if (process.env.NODE_ENV !== 'development') {
+        return res.status(404).json({ message: 'Not found' });
+    }
     const { email } = req.query;
     if (!email) {
         return res.status(400).json({ message: 'Email is required' });
@@ -286,28 +297,26 @@ router.get('/debug-user', async (req, res) => {
     try {
         console.log('🔍 Debug user lookup for:', email);
         const pool = database_1.default.getPool();
-        const [users] = await pool.query('SELECT UserId, Email, Password FROM Users WHERE Email = ?', [email]);
+        const [users] = await pool.query('SELECT UserId, Email, FirstName, LastName, CreationDate, IsActive FROM Users WHERE Email = ?', [email]);
         if (!users || users.length === 0) {
-            console.log('❌ Debug: User not found:', email);
             return res.status(404).json({
                 message: 'User not found',
-                details: `No user found with email: ${email}`
+                email: email
             });
         }
         const user = users[0];
-        console.log('✅ Debug: User found:', user.UserId);
         res.json({
             userId: user.UserId,
             email: user.Email,
-            passwordHashLength: user.Password.length,
-            passwordHashPreview: user.Password.substring(0, 10) + '...'
+            name: `${user.FirstName} ${user.LastName}`,
+            creationDate: user.CreationDate,
+            isActive: user.IsActive
         });
     }
     catch (error) {
-        console.error('Debug user error:', error);
+        console.error('❌ Debug user error:', error);
         res.status(500).json({
-            message: 'Server error during user lookup',
-            details: error instanceof Error ? error.message : 'Unknown error'
+            message: 'Server error during user lookup'
         });
     }
 });
